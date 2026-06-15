@@ -1,0 +1,113 @@
+{
+  "currentMemberID": "4D99EF67-4E8F-4BA6-9E96-1E62E7680010",
+  "groups": [
+    {
+      "id": "D54C3FB6-11E8-447D-A2BB-EF9505087101",
+      "name": "长期主义小组",
+      "subtitle": "互相同步仓位、理由和风险",
+      "inviteCode": "LONG-2026",
+      "members": [
+        {
+          "id": "4D99EF67-4E8F-4BA6-9E96-1E62E7680010",
+          "displayName": "我",
+          "avatarSymbol": "person.crop.circle.fill",
+          "role": "owner",
+          "joinedAt": "2024-07-03T09:46:40.000Z"
+        },
+        {
+          "id": "3B958ED1-1FC0-4EBA-877D-97CFE89B3DA6",
+          "displayName": "Alice",
+          "avatarSymbol": "chart.line.uptrend.xyaxis.circle.fill",
+          "role": "member",
+          "joinedAt": "2024-07-03T10:46:40.000Z"
+        },
+        {
+          "id": "0426A6E2-A743-47BA-83F8-951702236762",
+          "displayName": "Ben",
+          "avatarSymbol": "wallet.pass.fill",
+          "role": "member",
+          "joinedAt": "2024-07-03T11:46:40.000Z"
+        }
+      ],
+      "defaultVisibility": "full",
+      "createdAt": "2024-07-03T09:46:40.000Z"
+    }
+  ],
+  "holdings": [
+    {
+      "id": "1C687970-A0EE-442D-A6F5-E5714B411001",
+      "groupID": "D54C3FB6-11E8-447D-A2BB-EF9505087101",
+      "ownerID": "4D99EF67-4E8F-4BA6-9E96-1E62E7680010",
+      "symbol": "VOO",
+      "assetName": "Vanguard S&P 500 ETF",
+      "market": "fund",
+      "quantity": 12,
+      "averageCost": 438,
+      "lastPrice": 486,
+      "currency": "USD",
+      "visibility": "full",
+      "note": "核心仓位，按月定投",
+      "updatedAt": "2025-06-15T15:06:40.000Z"
+    },
+    {
+      "id": "1C687970-A0EE-442D-A6F5-E5714B411002",
+      "groupID": "D54C3FB6-11E8-447D-A2BB-EF9505087101",
+      "ownerID": "4D99EF67-4E8F-4BA6-9E96-1E62E7680010",
+      "symbol": "MSFT",
+      "assetName": "Microsoft",
+      "market": "usStock",
+      "quantity": 8,
+      "averageCost": 392,
+      "lastPrice": 445,
+      "currency": "USD",
+      "visibility": "amountOnly",
+      "note": "AI 与云业务继续观察",
+      "updatedAt": "2025-06-15T23:26:40.000Z"
+    },
+    {
+      "id": "1C687970-A0EE-442D-A6F5-E5714B411003",
+      "groupID": "D54C3FB6-11E8-447D-A2BB-EF9505087101",
+      "ownerID": "3B958ED1-1FC0-4EBA-877D-97CFE89B3DA6",
+      "symbol": "VOO",
+      "assetName": "Vanguard S&P 500 ETF",
+      "market": "fund",
+      "quantity": 18,
+      "averageCost": 421,
+      "lastPrice": 486,
+      "currency": "USD",
+      "visibility": "full",
+      "note": "组合底仓",
+      "updatedAt": "2025-06-16T04:00:00.000Z"
+    },
+    {
+      "id": "1C687970-A0EE-442D-A6F5-E5714B411004",
+      "groupID": "D54C3FB6-11E8-447D-A2BB-EF9505087101",
+      "ownerID": "3B958ED1-1FC0-4EBA-877D-97CFE89B3DA6",
+      "symbol": "0700",
+      "assetName": "Tencent Holdings",
+      "market": "hkStock",
+      "quantity": 100,
+      "averageCost": 310,
+      "lastPrice": 386,
+      "currency": "HKD",
+      "visibility": "full",
+      "note": "港股弹性仓位",
+      "updatedAt": "2025-06-16T12:20:00.000Z"
+    },
+    {
+      "id": "1C687970-A0EE-442D-A6F5-E5714B411005",
+      "groupID": "D54C3FB6-11E8-447D-A2BB-EF9505087101",
+      "ownerID": "0426A6E2-A743-47BA-83F8-951702236762",
+      "symbol": "BTC",
+      "assetName": "Bitcoin",
+      "market": "crypto",
+      "quantity": 0.16,
+      "averageCost": 61000,
+      "lastPrice": 68000,
+      "currency": "USD",
+      "visibility": "symbolOnly",
+      "note": "小比例配置",
+      "updatedAt": "2025-06-16T15:06:40.000Z"
+    }
+  ]
+}

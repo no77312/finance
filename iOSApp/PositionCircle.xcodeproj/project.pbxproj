@@ -1,0 +1,421 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		200000000000000000000001 /* PositionCircleApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000001 /* PositionCircleApp.swift */; };
+		200000000000000000000002 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000002 /* RootView.swift */; };
+		200000000000000000000003 /* GroupDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000003 /* GroupDashboardView.swift */; };
+		200000000000000000000004 /* MyHoldingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000004 /* MyHoldingsView.swift */; };
+		200000000000000000000005 /* MembersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000005 /* MembersView.swift */; };
+		200000000000000000000006 /* PositionFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000006 /* PositionFormView.swift */; };
+		200000000000000000000007 /* NewGroupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000007 /* NewGroupView.swift */; };
+		200000000000000000000008 /* SharedViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000008 /* SharedViews.swift */; };
+		200000000000000000000009 /* PortfolioStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000009 /* PortfolioStore.swift */; };
+		200000000000000000000010 /* HoldingRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000010 /* HoldingRows.swift */; };
+		200000000000000000000011 /* MetricCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000011 /* MetricCard.swift */; };
+		200000000000000000000012 /* Formatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000012 /* Formatters.swift */; };
+		200000000000000000000013 /* DomainModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000013 /* DomainModels.swift */; };
+		200000000000000000000014 /* PortfolioAnalytics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000014 /* PortfolioAnalytics.swift */; };
+		200000000000000000000015 /* DemoData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000015 /* DemoData.swift */; };
+		200000000000000000000016 /* PositionCircleAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000017 /* PositionCircleAPIClient.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		100000000000000000000001 /* PositionCircleApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PositionCircleApp.swift; sourceTree = "<group>"; };
+		100000000000000000000002 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		100000000000000000000003 /* GroupDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupDashboardView.swift; sourceTree = "<group>"; };
+		100000000000000000000004 /* MyHoldingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyHoldingsView.swift; sourceTree = "<group>"; };
+		100000000000000000000005 /* MembersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MembersView.swift; sourceTree = "<group>"; };
+		100000000000000000000006 /* PositionFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PositionFormView.swift; sourceTree = "<group>"; };
+		100000000000000000000007 /* NewGroupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewGroupView.swift; sourceTree = "<group>"; };
+		100000000000000000000008 /* SharedViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedViews.swift; sourceTree = "<group>"; };
+		100000000000000000000009 /* PortfolioStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortfolioStore.swift; sourceTree = "<group>"; };
+		100000000000000000000010 /* HoldingRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoldingRows.swift; sourceTree = "<group>"; };
+		100000000000000000000011 /* MetricCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricCard.swift; sourceTree = "<group>"; };
+		100000000000000000000012 /* Formatters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Formatters.swift; sourceTree = "<group>"; };
+		100000000000000000000013 /* DomainModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DomainModels.swift; sourceTree = "<group>"; };
+		100000000000000000000014 /* PortfolioAnalytics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortfolioAnalytics.swift; sourceTree = "<group>"; };
+		100000000000000000000015 /* DemoData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoData.swift; sourceTree = "<group>"; };
+		100000000000000000000016 /* PositionCircle.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PositionCircle.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		100000000000000000000017 /* PositionCircleAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PositionCircleAPIClient.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		300000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		000000000000000000000002 = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000004 /* PositionCircle */,
+				000000000000000000000008 /* PositionCircleCore */,
+				000000000000000000000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		000000000000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				100000000000000000000016 /* PositionCircle.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		000000000000000000000004 /* PositionCircle */ = {
+			isa = PBXGroup;
+			children = (
+				100000000000000000000001 /* PositionCircleApp.swift */,
+				000000000000000000000007 /* Stores */,
+				000000000000000000000005 /* Views */,
+				000000000000000000000006 /* Components */,
+			);
+			path = PositionCircle;
+			sourceTree = "<group>";
+		};
+		000000000000000000000005 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				100000000000000000000002 /* RootView.swift */,
+				100000000000000000000003 /* GroupDashboardView.swift */,
+				100000000000000000000004 /* MyHoldingsView.swift */,
+				100000000000000000000005 /* MembersView.swift */,
+				100000000000000000000006 /* PositionFormView.swift */,
+				100000000000000000000007 /* NewGroupView.swift */,
+				100000000000000000000008 /* SharedViews.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		000000000000000000000006 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				100000000000000000000010 /* HoldingRows.swift */,
+				100000000000000000000011 /* MetricCard.swift */,
+				100000000000000000000012 /* Formatters.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		000000000000000000000007 /* Stores */ = {
+			isa = PBXGroup;
+			children = (
+				100000000000000000000009 /* PortfolioStore.swift */,
+				100000000000000000000017 /* PositionCircleAPIClient.swift */,
+			);
+			path = Stores;
+			sourceTree = "<group>";
+		};
+		000000000000000000000008 /* PositionCircleCore */ = {
+			isa = PBXGroup;
+			children = (
+				100000000000000000000013 /* DomainModels.swift */,
+				100000000000000000000014 /* PortfolioAnalytics.swift */,
+				100000000000000000000015 /* DemoData.swift */,
+			);
+			path = ../Sources/PositionCircleCore;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		00000000000000000000000A /* PositionCircle */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 500000000000000000000002 /* Build configuration list for PBXNativeTarget "PositionCircle" */;
+			buildPhases = (
+				300000000000000000000003 /* Sources */,
+				300000000000000000000001 /* Frameworks */,
+				300000000000000000000002 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = PositionCircle;
+			productName = PositionCircle;
+			productReference = 100000000000000000000016 /* PositionCircle.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		000000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					00000000000000000000000A = {
+						CreatedOnToolsVersion = 16.0;
+					};
+				};
+			};
+			buildConfigurationList = 500000000000000000000001 /* Build configuration list for PBXProject "PositionCircle" */;
+			compatibilityVersion = "Xcode 15.0";
+			developmentRegion = zh-Hans;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				zh-Hans,
+				en,
+				Base,
+			);
+			mainGroup = 000000000000000000000002;
+			productRefGroup = 000000000000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				00000000000000000000000A /* PositionCircle */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		300000000000000000000002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		300000000000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				200000000000000000000013 /* DomainModels.swift in Sources */,
+				200000000000000000000014 /* PortfolioAnalytics.swift in Sources */,
+				200000000000000000000015 /* DemoData.swift in Sources */,
+				200000000000000000000001 /* PositionCircleApp.swift in Sources */,
+				200000000000000000000009 /* PortfolioStore.swift in Sources */,
+				200000000000000000000016 /* PositionCircleAPIClient.swift in Sources */,
+				200000000000000000000012 /* Formatters.swift in Sources */,
+				200000000000000000000011 /* MetricCard.swift in Sources */,
+				200000000000000000000010 /* HoldingRows.swift in Sources */,
+				200000000000000000000008 /* SharedViews.swift in Sources */,
+				200000000000000000000002 /* RootView.swift in Sources */,
+				200000000000000000000003 /* GroupDashboardView.swift in Sources */,
+				200000000000000000000004 /* MyHoldingsView.swift in Sources */,
+				200000000000000000000005 /* MembersView.swift in Sources */,
+				200000000000000000000006 /* PositionFormView.swift in Sources */,
+				200000000000000000000007 /* NewGroupView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		400000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		400000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		400000000000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "持仓圈";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
+				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.PositionCircle;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		400000000000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "持仓圈";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
+				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.PositionCircle;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		500000000000000000000001 /* Build configuration list for PBXProject "PositionCircle" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				400000000000000000000001 /* Debug */,
+				400000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		500000000000000000000002 /* Build configuration list for PBXNativeTarget "PositionCircle" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				400000000000000000000003 /* Debug */,
+				400000000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 000000000000000000000001 /* Project object */;
+}
