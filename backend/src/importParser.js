@@ -74,16 +74,19 @@ export async function parseScreenshotImport({
         holdings: normalizeDrafts(parsed.holdings, visibility),
         warnings: parsed.warnings ?? []
       };
-    } catch {
-      const fallback = parseWithRules({ text, visibility });
+    } catch (error) {
+      const fallback = parseWithRules({ text, visibility, hasModelKey: true });
       return {
         ...fallback,
-        warnings: ["大模型解析暂不可用，已使用基础规则解析。", ...fallback.warnings]
+        warnings: [
+          `大模型解析暂不可用，已使用基础规则解析。${openAIErrorSummary(error)}`,
+          ...fallback.warnings
+        ]
       };
     }
   }
 
-  return parseWithRules({ text, visibility });
+  return parseWithRules({ text, visibility, hasModelKey: false });
 }
 
 async function parseWithOpenAI({ text, visibility, brokerHint, locale }) {
@@ -150,7 +153,8 @@ async function parseWithOpenAI({ text, visibility, brokerHint, locale }) {
     });
 
     if (!response.ok) {
-      throw new Error(`OpenAI returned ${response.status}`);
+      const message = await openAIErrorMessage(response);
+      throw new Error(`OpenAI returned ${response.status}${message ? `: ${message}` : ""}`);
     }
 
     const data = await response.json();
@@ -164,7 +168,7 @@ async function parseWithOpenAI({ text, visibility, brokerHint, locale }) {
   }
 }
 
-function parseWithRules({ text, visibility }) {
+function parseWithRules({ text, visibility, hasModelKey = false }) {
   const lines = text
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -204,10 +208,31 @@ function parseWithRules({ text, visibility }) {
   return {
     source: "fallback",
     holdings: dedupeDrafts(normalizeDrafts(holdings, visibility)),
-    warnings: [
-      "当前未配置 OPENAI_API_KEY，已使用基础规则解析；请在确认页核对数量、成本和现价。"
-    ]
+    warnings: hasModelKey
+      ? ["已回退到基础规则解析；请在确认页核对数量、成本和现价。"]
+      : ["当前未配置 OPENAI_API_KEY，已使用基础规则解析；请在确认页核对数量、成本和现价。"]
   };
+}
+
+async function openAIErrorMessage(response) {
+  try {
+    const data = await response.json();
+    return cleanOpenAIError(data.error?.message ?? data.error ?? "");
+  } catch {
+    return "";
+  }
+}
+
+function openAIErrorSummary(error) {
+  const message = cleanOpenAIError(error?.message ?? "");
+  return message ? `（${message}）` : "";
+}
+
+function cleanOpenAIError(value) {
+  return String(value)
+    .replace(/sk-[A-Za-z0-9_-]+/g, "sk-***")
+    .replace(/sk-proj-[A-Za-z0-9_-]+/g, "sk-proj-***")
+    .trim();
 }
 
 function contextForSymbol(lines, startIndex) {
