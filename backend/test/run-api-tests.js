@@ -69,6 +69,7 @@ async function parsesScreenshotImportDraftsWithoutModelKey() {
     assert.ok(parsed.holdings.some((holding) => holding.symbol === "AAPL"));
     assert.ok(parsed.holdings.some((holding) => holding.symbol === "0700"));
     assert.equal(parsed.holdings.find((holding) => holding.symbol === "AAPL").visibility, "amountOnly");
+    assert.equal(parsed.holdings.find((holding) => holding.symbol === "AAPL").marketValue, null);
   } finally {
     if (previousKey) {
       process.env.OPENAI_API_KEY = previousKey;

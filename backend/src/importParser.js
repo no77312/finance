@@ -178,7 +178,7 @@ function parseWithRules({ text, visibility }) {
       continue;
     }
 
-    const context = lines.slice(index, index + 4).join(" ");
+    const context = contextForSymbol(lines, index);
     const numericContext = context.replace(new RegExp(`\\b${escapeRegExp(symbol)}\\b`, "g"), " ");
     const numbers = numbersFromText(numericContext);
     const currency = currencyFromText(context, symbol);
@@ -208,6 +208,17 @@ function parseWithRules({ text, visibility }) {
       "当前未配置 OPENAI_API_KEY，已使用基础规则解析；请在确认页核对数量、成本和现价。"
     ]
   };
+}
+
+function contextForSymbol(lines, startIndex) {
+  const contextLines = [lines[startIndex]];
+  for (let index = startIndex + 1; index < lines.length && contextLines.length < 4; index += 1) {
+    if (symbolFromLine(lines[index])) {
+      break;
+    }
+    contextLines.push(lines[index]);
+  }
+  return contextLines.join(" ");
 }
 
 function normalizeDrafts(drafts = [], fallbackVisibility) {
@@ -398,11 +409,17 @@ function looksNumeric(value) {
 }
 
 function optionalPositive(value) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? number : null;
 }
 
 function optionalNonNegative(value) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? number : null;
 }
