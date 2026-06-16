@@ -66,6 +66,9 @@ async function servesHealthAndBootstrapData() {
   const health = await getJson("/health");
   assert.equal(health.status, "ok");
 
+  const rejected = await fetch(`${baseURL}/api/bootstrap`);
+  assert.equal(rejected.status, 403);
+
   const bootstrap = await getJson("/api/bootstrap");
   assert.equal(bootstrap.currentMemberID, memberID);
   assert.equal(bootstrap.groups.length, 1);
@@ -374,17 +377,25 @@ async function updatesAndDeletesOwnedHolding() {
 }
 
 async function getJson(path) {
+  if (!path.startsWith("/health")) {
+    return getJsonWithHeaders(path, { "X-Member-ID": memberID });
+  }
+
   const response = await fetch(`${baseURL}${path}`);
   assert.equal(response.ok, true, `${path} returned ${response.status}`);
   return response.json();
 }
 
 async function getJsonWithMember(member, sessionToken, path) {
+  return getJsonWithHeaders(path, {
+    "X-Member-ID": member,
+    "X-Session-Token": sessionToken
+  });
+}
+
+async function getJsonWithHeaders(path, headers) {
   const response = await fetch(`${baseURL}${path}`, {
-    headers: {
-      "X-Member-ID": member,
-      "X-Session-Token": sessionToken
-    }
+    headers
   });
   assert.equal(response.ok, true, `${path} returned ${response.status}`);
   return response.json();

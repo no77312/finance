@@ -60,11 +60,9 @@ async function routeRequest(request, response, store, context) {
 
   if (request.method === "GET" && url.pathname === "/api/bootstrap") {
     const data = await store.read();
-    const memberID = memberIDForRequest(request);
-    if (memberID) {
-      requireSessionForUser(data, memberID, request);
-    }
-    return send(response, 200, memberID ? bootstrapForMember(data, memberID) : data);
+    const memberID = requireMemberID(request);
+    requireSessionForUser(data, memberID, request);
+    return send(response, 200, bootstrapForMember(data, memberID));
   }
 
   const parts = url.pathname.split("/").filter(Boolean);
@@ -159,12 +157,10 @@ async function routeRequest(request, response, store, context) {
 
   if (request.method === "GET" && parts.length === 2) {
     const data = await store.read();
-    const memberID = memberIDForRequest(request);
-    if (memberID) {
-      requireSessionForUser(data, memberID, request);
-    }
+    const memberID = requireMemberID(request);
+    requireSessionForUser(data, memberID, request);
     return send(response, 200, {
-      groups: memberID ? groupsForMember(data, memberID) : data.groups
+      groups: groupsForMember(data, memberID)
     });
   }
 
@@ -207,20 +203,16 @@ async function routeRequest(request, response, store, context) {
 
   if (request.method === "GET" && parts.length === 3) {
     const data = await store.read();
-    const memberID = memberIDForRequest(request);
-    if (memberID) {
-      requireSessionForUser(data, memberID, request);
-    }
+    const memberID = requireMemberID(request);
+    requireSessionForUser(data, memberID, request);
     const group = requireGroupAccess(data, groupID, memberID);
     return send(response, 200, { group });
   }
 
   if (parts[3] === "analytics" && request.method === "GET" && parts.length === 4) {
     const data = await store.read();
-    const memberID = memberIDForRequest(request);
-    if (memberID) {
-      requireSessionForUser(data, memberID, request);
-    }
+    const memberID = requireMemberID(request);
+    requireSessionForUser(data, memberID, request);
     const group = requireGroupAccess(data, groupID, memberID);
     const holdings = data.holdings.filter((holding) => holding.groupID === groupID);
     return send(response, 200, {
@@ -251,23 +243,19 @@ async function routeRequest(request, response, store, context) {
 
   if (parts[3] === "holding-events" && request.method === "GET" && parts.length === 4) {
     const data = await store.read();
-    const memberID = memberIDForRequest(request);
-    if (memberID) {
-      requireSessionForUser(data, memberID, request);
-    }
+    const memberID = requireMemberID(request);
+    requireSessionForUser(data, memberID, request);
     requireGroupAccess(data, groupID, memberID);
     const events = data.holdingEvents
-      .filter((event) => event.groupID === groupID && (!memberID || event.ownerID === memberID))
+      .filter((event) => event.groupID === groupID)
       .sort((first, second) => new Date(second.createdAt) - new Date(first.createdAt));
     return send(response, 200, { events });
   }
 
   if (parts[3] === "holdings" && request.method === "GET" && parts.length === 4) {
     const data = await store.read();
-    const memberID = memberIDForRequest(request);
-    if (memberID) {
-      requireSessionForUser(data, memberID, request);
-    }
+    const memberID = requireMemberID(request);
+    requireSessionForUser(data, memberID, request);
     requireGroupAccess(data, groupID, memberID);
     const holdings = data.holdings
       .filter((holding) => holding.groupID === groupID)
