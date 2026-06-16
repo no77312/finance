@@ -108,6 +108,11 @@ function bindEvents() {
       return;
     }
 
+    if (action === "copy-invite") {
+      copyInviteCode(value);
+      return;
+    }
+
     if (action === "select-member") {
       state.selectedMemberID = value;
       render();
@@ -217,7 +222,7 @@ function renderApp() {
 
   app.className = "app-shell";
   app.innerHTML = `
-    ${topbarHTML(groups, activeGroup)}
+    ${topbarHTML(activeGroup)}
     ${activeGroup ? mainContentHTML(activeGroup) : emptyWorkspaceHTML()}
     ${tabbarHTML()}
     ${sheetHTML(activeGroup)}
@@ -225,39 +230,24 @@ function renderApp() {
   `;
 }
 
-function topbarHTML(groups, activeGroup) {
-  const groupLabel = activeGroup?.name || "持仓圈";
+function topbarHTML(activeGroup) {
+  const tabLabel = {
+    overview: "总览",
+    members: "成员",
+    mine: "我的"
+  }[state.activeTab] ?? "持仓圈";
+
   return `
     <header class="topbar">
       <div class="topbar-row">
         <div class="topbar-copy min-w-0">
-          <div class="topbar-label">持仓圈</div>
-          <div class="topbar-heading">${escapeHTML(groupLabel)}</div>
+          <div class="topbar-label">${escapeHTML(tabLabel)}</div>
+          <div class="topbar-heading">${escapeHTML(activeGroup?.name || "持仓圈")}</div>
         </div>
-        <button class="secondary-button compact-button" type="button" data-action="sheet" data-value="groups">群组</button>
+        <button class="secondary-button compact-button topbar-menu-button" type="button" data-action="sheet" data-value="groups">群组</button>
       </div>
-      <div class="topbar-meta-row">
-        ${activeGroup ? `
-          <span>${escapeHTML(activeGroup.subtitle || "共享持仓与观点")}</span>
-          <span>${activeGroup.members?.length ?? 0} 人</span>
-          <span>邀请码 ${escapeHTML(activeGroup.inviteCode || "")}</span>
-        ` : `<span>创建或加入一个群组开始共享持仓。</span>`}
-      </div>
-      ${groups.length ? `
-        <div class="group-switcher" role="tablist" aria-label="群组切换">
-          ${groups.map((group) => groupChipHTML(group, group.id === activeGroup?.id)).join("")}
-        </div>
-      ` : ""}
+      <div class="topbar-subtle">${escapeHTML(activeGroup?.subtitle || "创建或加入一个群组开始共享持仓。")}</div>
     </header>
-  `;
-}
-
-function groupChipHTML(group, active) {
-  return `
-    <button class="group-chip ${active ? "active" : ""}" type="button" data-action="select-group" data-value="${escapeAttr(group.id)}" aria-pressed="${active ? "true" : "false"}">
-      <span class="group-chip-name">${escapeHTML(group.name)}</span>
-      <span class="group-chip-meta">${group.members?.length ?? 0} 人</span>
-    </button>
   `;
 }
 
@@ -287,8 +277,13 @@ function mainContentHTML(group) {
 function overviewHTML(group) {
   const holdings = groupHoldings(group.id);
   const summary = visibleSummary(holdings);
-  const exposures = exposureRows(holdings).slice(0, 8);
-  const recent = holdings.slice().sort(byUpdatedAt).slice(0, 5);
+  const visibleHoldingCount = holdings.filter((holding) => canSeeValues(holding)).length;
+  const contributingCount = new Set(holdings.map((holding) => holding.ownerID)).size;
+  const exposures = exposureRows(holdings)
+    .filter((exposure) => exposure.holderCount > 1)
+    .slice(0, 8);
+  const snapshots = recentSnapshotSummaries(group.id).slice(0, 6);
+  const latestSnapshotAt = groupLatestSnapshotAt(group.id);
 
   return `
     <main class="content overview-layout">
@@ -300,31 +295,43 @@ function overviewHTML(group) {
               <h2 class="section-title">${escapeHTML(group.name)}</h2>
               <div class="subtle">${escapeHTML(group.subtitle || "共享持仓与观点")}</div>
             </div>
-            <span class="pill blue">邀请码 ${escapeHTML(group.inviteCode || "")}</span>
+            ${group.inviteCode
+              ? `<button class="pill blue pill-button invite-button" type="button" data-action="copy-invite" data-value="${escapeAttr(group.inviteCode)}">复制邀请码 <strong>${escapeHTML(group.inviteCode)}</strong></button>`
+              : ""}
           </div>
           <div class="metric-grid grid">
             ${metricHTML("可见市值", money(summary.marketValue, "USD"))}
-            ${metricHTML("浮动盈亏", signedMoney(summary.pnl, "USD"), summary.pnl)}
-            ${metricHTML("持仓数", String(holdings.length))}
-            ${metricHTML("成员数", String(group.members?.length ?? 0))}
+            ${metricHTML("已提交成员", String(contributingCount))}
+            ${metricHTML("公开持仓", String(visibleHoldingCount))}
+            ${metricHTML("共识标的", String(exposures.length))}
+          </div>
+          <div class="portfolio-note group-overview-note">
+            <span>${latestSnapshotAt ? `最近提交 ${formatDateTime(latestSnapshotAt)}` : "还没有成员提交持仓。"}</span>
+            <span>${group.members?.length ?? 0} 位成员，金额统一折算为 USD</span>
           </div>
         </div>
         <div class="section-header">
-          <h2 class="section-title">共识标的</h2>
+          <div class="section-header-copy">
+            <h2 class="section-title">共识标的</h2>
+            <div class="subtle">只展示 2 位及以上成员同时持有的标的</div>
+          </div>
           <span class="subtle">${exposures.length} 项</span>
         </div>
         <div class="list">
-          ${exposures.length ? exposures.map(exposureHTML).join("") : `<div class="empty">暂无可见持仓。</div>`}
+          ${exposures.length ? exposures.map(exposureHTML).join("") : `<div class="empty">目前还没有多人同时持有的公开标的。</div>`}
         </div>
       </section>
       ${overviewMembersSectionHTML(group)}
       <section class="section section-wide">
         <div class="section-header">
-          <h2 class="section-title">最近更新</h2>
+          <div class="section-header-copy">
+            <h2 class="section-title">最近更新</h2>
+            <div class="subtle">按每次提交展示仓位占比变化</div>
+          </div>
           <button class="primary-button" type="button" data-action="sheet" data-value="submit">提交持仓</button>
         </div>
         <div class="list">
-          ${recent.length ? recent.map((holding) => holdingHTML(holding, { compact: true })).join("") : `<div class="empty">还没有成员提交持仓。</div>`}
+          ${snapshots.length ? snapshots.map(snapshotUpdateHTML).join("") : `<div class="empty">还没有成员提交持仓。</div>`}
         </div>
       </section>
     </main>
@@ -467,7 +474,7 @@ function memberOverviewCardHTML(member, groupID) {
         </div>
         <div class="value-stack">
           <div class="member-overview-value">${escapeHTML(primaryValue)}</div>
-          <div class="value-caption">${holdings.length ? `最大仓位 ${formatPercent(insights.maxWeight)}` : "等待提交"}</div>
+          <div class="value-caption">${escapeHTML(memberOverviewWeightCopy(holdings, insights))}</div>
         </div>
       </div>
       ${miniAllocationHTML(insights.topSlices, "member-allocation-strip")}
@@ -475,7 +482,7 @@ function memberOverviewCardHTML(member, groupID) {
         ${memberTopSymbolsHTML(insights, holdings)}
       </div>
       <div class="member-card-meta">
-        <span>前三集中 ${formatPercent(insights.top3Weight)}</span>
+        <span>${escapeHTML(memberOverviewConcentrationCopy(holdings, insights))}</span>
         <span>${latestActivity ? `更新 ${formatDateTime(latestActivity)}` : "暂无更新"}</span>
       </div>
     </button>
@@ -514,6 +521,26 @@ function memberOverviewCaption(holdings, insights) {
   return `${holdings.length} 项持仓`;
 }
 
+function memberOverviewWeightCopy(holdings, insights) {
+  if (!holdings.length) {
+    return "等待提交";
+  }
+  if (!insights.topSlices.length) {
+    return "仓位不可见";
+  }
+  return `最大仓位 ${formatPercent(insights.maxWeight)}`;
+}
+
+function memberOverviewConcentrationCopy(holdings, insights) {
+  if (!holdings.length) {
+    return "等待首次提交";
+  }
+  if (!insights.topSlices.length) {
+    return "公开仓位不可见";
+  }
+  return `前三集中 ${formatPercent(insights.top3Weight)}`;
+}
+
 function miniAllocationHTML(slices, className = "") {
   if (!slices.length) {
     return "";
@@ -549,6 +576,7 @@ function sheetHTML(group) {
   }
 
   if (state.sheet === "groups") {
+    const groups = state.data?.groups ?? [];
     return `
       <div class="sheet">
         <section class="sheet-panel">
@@ -556,6 +584,7 @@ function sheetHTML(group) {
             <h2 class="sheet-title">群组</h2>
             <button class="icon-button" type="button" data-action="close-sheet" aria-label="关闭">×</button>
           </div>
+          ${groups.length ? groupMenuHTML(groups) : ""}
           ${groupFormsHTML()}
         </section>
       </div>
@@ -595,6 +624,38 @@ function groupFormsHTML() {
         <button class="secondary-button" type="submit" ${state.busy ? "disabled" : ""}>加入</button>
       </form>
     </section>
+  `;
+}
+
+function groupMenuHTML(groups) {
+  return `
+    <section class="group-menu">
+      <div class="section-header">
+        <div class="section-header-copy">
+          <h3 class="section-title">切换群组</h3>
+          <div class="subtle">在这里切换已有群组，或继续创建新的群组</div>
+        </div>
+        <span class="subtle">${groups.length} 个</span>
+      </div>
+      <div class="group-menu-list">
+        ${groups.map((group) => groupMenuItemHTML(group, group.id === state.activeGroupID)).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function groupMenuItemHTML(group, active) {
+  return `
+    <button class="group-menu-item ${active ? "active" : ""}" type="button" data-action="select-group" data-value="${escapeAttr(group.id)}" aria-pressed="${active ? "true" : "false"}">
+      <div class="min-w-0">
+        <div class="group-menu-item-name">${escapeHTML(group.name)}</div>
+        <div class="group-menu-item-meta">
+          <span>${group.members?.length ?? 0} 人</span>
+          ${group.inviteCode ? `<span>邀请码 ${escapeHTML(group.inviteCode)}</span>` : ""}
+        </div>
+      </div>
+      <span class="pill ${active ? "blue" : ""}">${active ? "当前群组" : "切换"}</span>
+    </button>
   `;
 }
 
@@ -692,10 +753,16 @@ function holdingHTML(holding, options = {}) {
   const pnl = marketValue - costBasis;
   const portfolio = options.portfolio ?? null;
   const emphasizeWeight = Boolean(options.emphasizeWeight && portfolio);
+  const primaryValue = emphasizeWeight
+    ? weightHeadline(portfolio)
+    : (showValues ? money(marketValue, "USD") : "仅标的");
+  const secondaryValue = emphasizeWeight
+    ? (showValues ? money(marketValue, "USD") : "仅标的")
+    : (showValues ? "可见市值" : "金额不可见");
 
   return `
-    <article class="list-item">
-      <div class="holding-row">
+    <article class="list-item holding-card">
+      <div class="holding-card-head">
         <div class="min-w-0">
           <div class="holding-title">${escapeHTML(holding.assetName || holding.symbol)}</div>
           <div class="holding-meta">
@@ -703,23 +770,23 @@ function holdingHTML(holding, options = {}) {
             <span>${escapeHTML(labelForMarket(holding.market))}</span>
             <span>${escapeHTML(owner?.displayName || "")}</span>
             ${sourceCurrencyHTML(holding.currency)}
-            ${privacyPillHTML(holding)}
           </div>
         </div>
-        <div class="${emphasizeWeight ? "value-stack" : "value"}">
-          ${emphasizeWeight
-            ? `
-              <div class="weight-value">${escapeHTML(weightHeadline(portfolio))}</div>
-              <div class="value-caption">${showValues ? money(marketValue, "USD") : "仅标的"}</div>
-            `
-            : `${showValues ? money(marketValue, "USD") : "仅标的"}`}
+        <div class="holding-card-side">
+          ${privacyPillHTML(holding)}
+          <div class="value-stack">
+            <div class="${emphasizeWeight ? "weight-value" : "holding-primary-value"}">${escapeHTML(primaryValue)}</div>
+            <div class="value-caption">${escapeHTML(secondaryValue)}</div>
+          </div>
         </div>
       </div>
-      <div class="row-meta">
-        ${showValues ? `<span>数量 ${formatNumber(holding.quantity)}</span><span>现价 ${money(convertMoneyToUSD(holding.lastPrice, holding.currency), "USD")}</span>` : ""}
-        ${showCost ? `<span>成本 ${money(convertMoneyToUSD(holding.averageCost, holding.currency), "USD")}</span><span class="${classForNumber(pnl)}">${signedMoney(pnl, "USD")}</span>` : ""}
-        ${holding.priceDate ? `<span>收盘价 ${escapeHTML(holding.priceDate)}</span>` : ""}
-      </div>
+      ${holdingStatsHTML({
+        holding,
+        showValues,
+        showCost,
+        marketValue,
+        pnl
+      })}
       ${emphasizeWeight ? holdingWeightHTML(portfolio) : ""}
       ${holdingChangeHTML(holding)}
       ${options.editable ? `
@@ -777,9 +844,13 @@ function memberButtonHTML(member, groupID, active) {
 }
 
 function exposureHTML(exposure) {
+  const holders = exposure.holderIDs
+    .map((memberID) => memberForID(memberID))
+    .filter(Boolean);
+
   return `
-    <article class="list-item">
-      <div class="holding-row">
+    <article class="list-item exposure-card">
+      <div class="holding-card-head">
         <div class="min-w-0">
           <div class="holding-title">${escapeHTML(exposure.assetName || exposure.symbol)}</div>
           <div class="holding-meta">
@@ -788,13 +859,127 @@ function exposureHTML(exposure) {
             ${sourceCurrencyHTML(exposure.currency)}
           </div>
         </div>
-        <div class="value">${money(exposure.marketValue, "USD")}</div>
+        <div class="value-stack">
+          <div class="holding-primary-value">${money(exposure.marketValue, "USD")}</div>
+          <div class="value-caption">合计可见市值</div>
+        </div>
+      </div>
+      <div class="consensus-holder-row">
+        ${avatarStackHTML(holders, 4)}
+        <div class="consensus-holder-copy">${escapeHTML(holders.map((member) => member.displayName).join("、") || `${exposure.holderCount} 位成员`)}</div>
       </div>
       <div class="row-meta">
-        <span>数量 ${formatNumber(exposure.quantity)}</span>
-        <span class="${classForNumber(exposure.pnl)}">${signedMoney(exposure.pnl, "USD")}</span>
+        <span>合计数量 ${formatNumber(exposure.quantity)}</span>
+        <span>${exposure.holderCount} 位成员形成共识</span>
       </div>
     </article>
+  `;
+}
+
+function holdingStatsHTML({
+  holding,
+  showValues,
+  showCost,
+  marketValue,
+  pnl
+}) {
+  if (!showValues) {
+    return `<div class="holding-hidden-note">这条持仓仅公开标的，金额、仓位与盈亏不会展示。</div>`;
+  }
+
+  const stats = [
+    {
+      label: "数量",
+      value: formatNumber(holding.quantity)
+    },
+    {
+      label: "现价",
+      value: money(convertMoneyToUSD(holding.lastPrice, holding.currency), "USD")
+    }
+  ];
+
+  if (showCost) {
+    stats.splice(1, 0, {
+      label: "成本",
+      value: money(convertMoneyToUSD(holding.averageCost, holding.currency), "USD")
+    });
+    stats.push({
+      label: "盈亏",
+      value: signedMoney(pnl, "USD"),
+      tone: classForNumber(pnl)
+    });
+  } else {
+    stats.push({
+      label: "市值",
+      value: money(marketValue, "USD")
+    });
+  }
+
+  return `
+    <div class="holding-stat-grid">
+      ${stats.map((stat) => `
+        <div class="holding-stat">
+          <div class="holding-stat-label">${escapeHTML(stat.label)}</div>
+          <div class="holding-stat-value ${escapeAttr(stat.tone || "")}">${escapeHTML(stat.value)}</div>
+        </div>
+      `).join("")}
+      ${holding.priceDate ? `
+        <div class="holding-stat">
+          <div class="holding-stat-label">价格日期</div>
+          <div class="holding-stat-value">${escapeHTML(holding.priceDate)}</div>
+        </div>
+      ` : ""}
+    </div>
+    ${showCost ? "" : `<div class="holding-hidden-note">这条持仓隐藏了成本价，占比仅按当前可见市值计算。</div>`}
+  `;
+}
+
+function snapshotUpdateHTML(summary) {
+  return `
+    <article class="list-item snapshot-card">
+      <div class="snapshot-card-head">
+        <div class="account account-compact">
+          ${avatarHTML(summary.owner)}
+          <div class="min-w-0">
+            <div class="account-name">${escapeHTML(summary.owner?.displayName || "成员")}</div>
+            <div class="member-meta">${escapeHTML(summary.previousSnapshot ? "组合调仓" : "首次提交组合")}</div>
+          </div>
+        </div>
+        <div class="snapshot-meta">
+          <span class="pill ${summary.sourceTone}">${escapeHTML(summary.sourceLabel)}</span>
+          <span class="subtle">${escapeHTML(formatDateTime(summary.snapshot.createdAt))}</span>
+        </div>
+      </div>
+      <div class="weight-summary">
+        ${summary.summaryChips.length ? summary.summaryChips.map((chip) => `
+          <span class="weight-chip ${escapeAttr(chip.tone)}">${escapeHTML(chip.label)}</span>
+        `).join("") : `<span class="weight-chip">仓位占比无变化</span>`}
+      </div>
+      <div class="snapshot-change-list">
+        ${summary.rows.length ? summary.rows.map(snapshotChangeRowHTML).join("") : `<div class="snapshot-empty">本次提交没有产生新的仓位占比变化。</div>`}
+      </div>
+      ${summary.note ? `<div class="holding-change"><span>${escapeHTML(summary.note)}</span></div>` : ""}
+    </article>
+  `;
+}
+
+function snapshotChangeRowHTML(change) {
+  const tone = change.status === "up" || change.status === "new"
+    ? "positive"
+    : change.status === "down" || change.status === "removed"
+      ? "negative"
+      : "";
+
+  return `
+    <div class="snapshot-change-row">
+      <div class="snapshot-change-symbol min-w-0">
+        <strong>${escapeHTML(change.assetName || change.symbol)}</strong>
+        <span>${escapeHTML(change.symbol)} · ${escapeHTML(change.statusLabel)}</span>
+      </div>
+      <div class="snapshot-change-values ${tone}">
+        ${escapeHTML(formatPercent(change.beforeWeight))} -> ${escapeHTML(formatPercent(change.afterWeight))}
+      </div>
+    </div>
   `;
 }
 
@@ -995,6 +1180,37 @@ async function runBusy(task) {
   }
 }
 
+async function copyInviteCode(text) {
+  if (!text) {
+    return;
+  }
+
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      copyTextFallback(text);
+    }
+    setNotice("success", "邀请码已复制。");
+  } catch {
+    setNotice("error", "复制失败，请手动复制。");
+  }
+}
+
+function copyTextFallback(text) {
+  const input = document.createElement("textarea");
+  input.value = text;
+  input.setAttribute("readonly", "");
+  input.style.position = "fixed";
+  input.style.opacity = "0";
+  input.style.pointerEvents = "none";
+  input.style.inset = "0 auto auto -9999px";
+  document.body.appendChild(input);
+  input.select();
+  document.execCommand("copy");
+  document.body.removeChild(input);
+}
+
 async function api(path, options = {}) {
   const headers = {
     Accept: "application/json",
@@ -1134,6 +1350,7 @@ function exposureRows(holdings) {
   return Array.from(grouped.values())
     .map((item) => ({
       ...item,
+      holderIDs: Array.from(item.holderIDs),
       holderCount: item.holderIDs.size,
       pnl: item.costBasis ? item.marketValue - item.costBasis : 0
     }))
@@ -1153,9 +1370,13 @@ function isMine(holding) {
 }
 
 function memberForHolding(holding) {
+  return memberForID(holding.ownerID);
+}
+
+function memberForID(memberID) {
   return (state.data?.groups ?? [])
     .flatMap((group) => group.members ?? [])
-    .find((member) => member.id === holding.ownerID);
+    .find((member) => member.id === memberID);
 }
 
 function holdingEventsFor(holding) {
@@ -1194,6 +1415,155 @@ function holdingChangeHTML(holding) {
       ${items.map((item) => `<span>${escapeHTML(item)}</span>`).join("")}
     </div>
   `;
+}
+
+function groupLatestSnapshotAt(groupID) {
+  return groupSnapshots(groupID)[0]?.createdAt ?? null;
+}
+
+function groupSnapshots(groupID) {
+  return (state.data?.portfolioSnapshots ?? [])
+    .filter((snapshot) => snapshot.groupID === groupID)
+    .sort((first, second) => new Date(second.createdAt ?? 0) - new Date(first.createdAt ?? 0));
+}
+
+function recentSnapshotSummaries(groupID) {
+  return groupSnapshots(groupID)
+    .map((snapshot) => snapshotSummary(snapshot))
+    .filter((summary) => summary);
+}
+
+function snapshotSummary(snapshot) {
+  const owner = memberForID(snapshot.ownerID);
+  const previousSnapshot = previousSnapshotFor(snapshot);
+  const currentContext = snapshotPortfolioContext(snapshot);
+  const currentRows = [...currentContext.rows].sort((first, second) => second.weight - first.weight);
+  const hiddenCount = Math.max(0, (snapshot.holdings?.length ?? 0) - currentRows.length);
+  const sourceLabel = snapshot.source === "screenshot"
+    ? "截图导入"
+    : snapshot.source === "manual"
+      ? "手工提交"
+      : "历史快照";
+  const sourceTone = snapshot.source === "screenshot" ? "blue" : "";
+
+  if (!previousSnapshot) {
+    return {
+      snapshot,
+      owner,
+      previousSnapshot: null,
+      rows: currentRows.slice(0, 4).map((row) => ({
+        ...row,
+        beforeWeight: 0,
+        afterWeight: row.weight,
+        status: "new",
+        statusLabel: "首次出现"
+      })),
+      summaryChips: [
+        {
+          label: `${currentRows.length} 项公开仓位`,
+          tone: ""
+        }
+      ],
+      note: hiddenCount > 0 ? `另有 ${hiddenCount} 项仅公开标的，未纳入仓位占比。` : "",
+      sourceLabel,
+      sourceTone
+    };
+  }
+
+  const previousContext = snapshotPortfolioContext(previousSnapshot);
+  const changes = snapshotChangeRows(currentContext, previousContext);
+  const counts = countSnapshotStatuses(changes);
+
+  return {
+    snapshot,
+    owner,
+    previousSnapshot,
+    rows: changes.slice(0, 5),
+    summaryChips: snapshotSummaryChips(counts),
+    note: hiddenCount > 0 ? `本次有 ${hiddenCount} 项仅公开标的，未纳入仓位占比变化。` : "",
+    sourceLabel,
+    sourceTone
+  };
+}
+
+function previousSnapshotFor(snapshot) {
+  const snapshots = portfolioSnapshotsFor(snapshot.groupID, snapshot.ownerID);
+  const index = snapshots.findIndex((candidate) => candidate.id === snapshot.id);
+  return index > 0 ? snapshots[index - 1] : null;
+}
+
+function snapshotChangeRows(currentContext, previousContext) {
+  const currentRows = new Map(currentContext.rows.map((row) => [row.symbol, row]));
+  const previousRows = new Map(previousContext.rows.map((row) => [row.symbol, row]));
+  const symbols = new Set([...currentRows.keys(), ...previousRows.keys()]);
+  const changes = [];
+
+  for (const symbol of symbols) {
+    const current = currentRows.get(symbol) ?? null;
+    const previous = previousRows.get(symbol) ?? null;
+    const beforeWeight = previous?.weight ?? 0;
+    const afterWeight = current?.weight ?? 0;
+    const delta = afterWeight - beforeWeight;
+
+    if (Math.abs(delta) < 0.001) {
+      continue;
+    }
+
+    const status = beforeWeight === 0
+      ? "new"
+      : afterWeight === 0
+        ? "removed"
+        : delta > 0
+          ? "up"
+          : "down";
+
+    changes.push({
+      symbol,
+      assetName: current?.assetName || previous?.assetName || symbol,
+      beforeWeight,
+      afterWeight,
+      delta,
+      status,
+      statusLabel: {
+        new: "新进",
+        removed: "移除",
+        up: "加仓",
+        down: "减仓"
+      }[status] ?? "调整"
+    });
+  }
+
+  return changes.sort((first, second) => {
+    const deltaGap = Math.abs(second.delta) - Math.abs(first.delta);
+    if (Math.abs(deltaGap) > 0.0001) {
+      return deltaGap;
+    }
+    return second.afterWeight - first.afterWeight;
+  });
+}
+
+function countSnapshotStatuses(changes) {
+  return changes.reduce((counts, change) => {
+    counts[change.status] = (counts[change.status] ?? 0) + 1;
+    return counts;
+  }, {});
+}
+
+function snapshotSummaryChips(counts) {
+  const chips = [];
+  if (counts.new) {
+    chips.push({ label: `新进 ${counts.new}`, tone: "positive" });
+  }
+  if (counts.up) {
+    chips.push({ label: `加仓 ${counts.up}`, tone: "positive" });
+  }
+  if (counts.down) {
+    chips.push({ label: `减仓 ${counts.down}`, tone: "negative" });
+  }
+  if (counts.removed) {
+    chips.push({ label: `移除 ${counts.removed}`, tone: "negative" });
+  }
+  return chips;
 }
 
 function portfolioSummaryHTML(insights) {
@@ -1365,18 +1735,29 @@ function snapshotPortfolioContext(snapshot) {
   const totalVisibleValue = visibleHoldings.reduce((sum, holding) => sum + snapshotHoldingMarketValueUSD(holding), 0);
   const byHoldingID = new Map();
   const bySymbol = new Map();
+  const rowsBySymbol = new Map();
 
   for (const holding of visibleHoldings) {
     const marketValue = snapshotHoldingMarketValueUSD(holding);
     const weight = totalVisibleValue > 0 ? marketValue / totalVisibleValue : 0;
     byHoldingID.set(holding.holdingID, weight);
     bySymbol.set(holding.symbol, (bySymbol.get(holding.symbol) ?? 0) + weight);
+    const row = rowsBySymbol.get(holding.symbol) ?? {
+      symbol: holding.symbol,
+      assetName: holding.assetName,
+      marketValue: 0,
+      weight: 0
+    };
+    row.marketValue += marketValue;
+    row.weight += weight;
+    rowsBySymbol.set(holding.symbol, row);
   }
 
   return {
     totalVisibleValue,
     byHoldingID,
-    bySymbol
+    bySymbol,
+    rows: Array.from(rowsBySymbol.values())
   };
 }
 
@@ -1722,6 +2103,25 @@ function avatarHTML(user) {
     return `<div class="avatar"><img src="${escapeAttr(pictureURL)}" alt=""></div>`;
   }
   return `<div class="avatar">${escapeHTML(name.trim().slice(0, 1) || "持")}</div>`;
+}
+
+function avatarStackHTML(users, limit = 4) {
+  const items = users.slice(0, limit);
+  const extraCount = Math.max(0, users.length - items.length);
+  return `
+    <div class="avatar-stack" aria-hidden="true">
+      ${items.map((user) => miniAvatarHTML(user)).join("")}
+      ${extraCount ? `<span class="mini-avatar mini-avatar-more">+${extraCount}</span>` : ""}
+    </div>
+  `;
+}
+
+function miniAvatarHTML(user) {
+  const pictureURL = user?.pictureURL || user?.picture;
+  const name = user?.displayName || "成员";
+  return pictureURL
+    ? `<span class="mini-avatar"><img src="${escapeAttr(pictureURL)}" alt=""></span>`
+    : `<span class="mini-avatar">${escapeHTML(name.trim().slice(0, 1) || "持")}</span>`;
 }
 
 function icon(name) {
