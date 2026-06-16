@@ -9,7 +9,7 @@ const state = {
   activeGroupID: "",
   selectedMemberID: "",
   sheet: "",
-  submitMode: "manual",
+  submitMode: "screenshot",
   editHoldingID: "",
   drafts: [],
   message: "",
@@ -71,6 +71,7 @@ function bindEvents() {
       if (value === "submit") {
         state.editHoldingID = "";
         state.drafts = [];
+        state.submitMode = "screenshot";
       }
       render();
       return;
