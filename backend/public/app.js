@@ -1,5 +1,13 @@
 const app = document.querySelector("#app");
 const sessionKey = "position-circle:pwa-session";
+const fxRatesToUSD = {
+  USD: 1,
+  HKD: 0.1282,
+  CNY: 0.1392,
+  SGD: 0.7421
+};
+
+let noticeTimer = 0;
 
 const state = {
   config: null,
@@ -35,6 +43,7 @@ async function init() {
     } catch {
       clearSession();
       state.error = "登录状态已失效，请重新登录。";
+      armNoticeDismiss();
     }
   }
 
@@ -52,6 +61,7 @@ function bindEvents() {
     const value = target.dataset.value ?? "";
 
     if (action === "sign-out") {
+      clearNotice();
       clearSession();
       render();
       return;
@@ -60,14 +70,14 @@ function bindEvents() {
     if (action === "tab") {
       state.activeTab = value;
       state.sheet = "";
+      clearNotice();
       render();
       return;
     }
 
     if (action === "sheet") {
       state.sheet = value;
-      state.error = "";
-      state.message = "";
+      clearNotice();
       if (value === "submit") {
         state.editHoldingID = "";
         state.drafts = [];
@@ -84,8 +94,7 @@ function bindEvents() {
 
     if (action === "submit-mode") {
       state.submitMode = value;
-      state.error = "";
-      state.message = "";
+      clearNotice();
       render();
       return;
     }
@@ -100,8 +109,7 @@ function bindEvents() {
       state.editHoldingID = value;
       state.submitMode = "manual";
       state.sheet = "submit";
-      state.error = "";
-      state.message = "";
+      clearNotice();
       render();
       return;
     }
@@ -145,8 +153,7 @@ function bindEvents() {
 
 async function handleGoogleCredential(response) {
   if (!response?.credential) {
-    state.error = "没有收到 Google 登录凭证。";
-    render();
+    setNotice("error", "没有收到 Google 登录凭证。");
     return;
   }
 
@@ -160,8 +167,7 @@ async function handleGoogleCredential(response) {
     state.data = normalizeBootstrap(result);
     state.activeGroupID = result.groups?.[0]?.id ?? "";
     state.activeTab = "overview";
-    state.message = "";
-    state.error = "";
+    clearNotice();
   });
 }
 
@@ -186,8 +192,8 @@ function renderLogin() {
         </div>
         <div id="googleButton" class="google-slot"></div>
         ${state.config?.googleClientID ? "" : `<div class="config-warning">需要在 Render 环境变量里配置 GOOGLE_CLIENT_ID。</div>`}
-        ${noticeHTML()}
       </section>
+      ${toastHTML()}
     </main>
   `;
 
@@ -203,10 +209,10 @@ function renderApp() {
   app.className = "app-shell";
   app.innerHTML = `
     ${topbarHTML(user, groups, activeGroup)}
-    ${noticeHTML()}
     ${activeGroup ? mainContentHTML(activeGroup) : emptyWorkspaceHTML()}
     ${tabbarHTML()}
     ${sheetHTML(activeGroup)}
+    ${toastHTML()}
   `;
 }
 
@@ -266,8 +272,8 @@ function overviewHTML(group) {
     <main class="content">
       <section class="section">
         <div class="metric-grid grid">
-          ${metricHTML("可见市值", money(summary.marketValue, summary.currency))}
-          ${metricHTML("浮动盈亏", signedMoney(summary.pnl, summary.currency), summary.pnl)}
+          ${metricHTML("可见市值", money(summary.marketValue, "USD"))}
+          ${metricHTML("浮动盈亏", signedMoney(summary.pnl, "USD"), summary.pnl)}
           ${metricHTML("持仓数", String(holdings.length))}
           ${metricHTML("成员数", String(group.members?.length ?? 0))}
         </div>
@@ -368,7 +374,6 @@ function sheetHTML(group) {
             <h2 class="sheet-title">群组</h2>
             <button class="icon-button" type="button" data-action="close-sheet" aria-label="关闭">×</button>
           </div>
-          ${noticeHTML()}
           ${groupFormsHTML()}
         </section>
       </div>
@@ -419,7 +424,6 @@ function submitSheetHTML(group) {
           <h2 class="sheet-title">${state.editHoldingID ? "编辑持仓" : "提交持仓"}</h2>
           <button class="icon-button" type="button" data-action="close-sheet" aria-label="关闭">×</button>
         </div>
-        ${noticeHTML()}
         <div class="segmented">
           <button type="button" class="${state.submitMode === "manual" ? "active" : ""}" data-action="submit-mode" data-value="manual">手工输入</button>
           <button type="button" class="${state.submitMode === "screenshot" ? "active" : ""}" data-action="submit-mode" data-value="screenshot">截图导入</button>
@@ -501,8 +505,8 @@ function holdingHTML(holding, options = {}) {
   const owner = memberForHolding(holding);
   const showValues = canSeeValues(holding);
   const showCost = canSeeCost(holding);
-  const marketValue = Number(holding.quantity) * Number(holding.lastPrice);
-  const costBasis = Number(holding.quantity) * Number(holding.averageCost);
+  const marketValue = holdingMarketValueUSD(holding);
+  const costBasis = holdingCostBasisUSD(holding);
   const pnl = marketValue - costBasis;
 
   return `
@@ -514,22 +518,24 @@ function holdingHTML(holding, options = {}) {
             <span>${escapeHTML(holding.symbol)}</span>
             <span>${escapeHTML(labelForMarket(holding.market))}</span>
             <span>${escapeHTML(owner?.displayName || "")}</span>
+            ${sourceCurrencyHTML(holding.currency)}
             ${privacyPillHTML(holding)}
           </div>
         </div>
         <div class="value">
-          ${showValues ? money(marketValue, holding.currency) : "仅标的"}
+          ${showValues ? money(marketValue, "USD") : "仅标的"}
         </div>
       </div>
       <div class="row-meta">
-        ${showValues ? `<span>数量 ${formatNumber(holding.quantity)}</span><span>现价 ${money(holding.lastPrice, holding.currency)}</span>` : ""}
-        ${showCost ? `<span>成本 ${money(holding.averageCost, holding.currency)}</span><span class="${classForNumber(pnl)}">${signedMoney(pnl, holding.currency)}</span>` : ""}
+        ${showValues ? `<span>数量 ${formatNumber(holding.quantity)}</span><span>现价 ${money(convertMoneyToUSD(holding.lastPrice, holding.currency), "USD")}</span>` : ""}
+        ${showCost ? `<span>成本 ${money(convertMoneyToUSD(holding.averageCost, holding.currency), "USD")}</span><span class="${classForNumber(pnl)}">${signedMoney(pnl, "USD")}</span>` : ""}
         ${holding.priceDate ? `<span>收盘价 ${escapeHTML(holding.priceDate)}</span>` : ""}
       </div>
+      ${holdingChangeHTML(holding)}
       ${options.editable ? `
         <div class="actions">
-          <button class="secondary-button" type="button" data-action="edit-holding" data-value="${escapeAttr(holding.id)}">编辑</button>
-          <button class="danger-button" type="button" data-action="delete-holding" data-value="${escapeAttr(holding.id)}">删除</button>
+          <button class="secondary-button compact-button" type="button" data-action="edit-holding" data-value="${escapeAttr(holding.id)}">编辑</button>
+          <button class="danger-button compact-button" type="button" data-action="delete-holding" data-value="${escapeAttr(holding.id)}">删除</button>
         </div>
       ` : ""}
     </article>
@@ -546,7 +552,7 @@ function holdingDraftHTML(draft) {
           <div class="holding-meta">
             <span>${escapeHTML(draft.symbol)}</span>
             <span>${escapeHTML(labelForMarket(draft.market))}</span>
-            <span>${escapeHTML(draft.currency)}</span>
+            ${sourceCurrencyHTML(draft.currency)}
             <span>${Math.round(Number(draft.confidence ?? 0) * 100)}%</span>
           </div>
         </div>
@@ -574,7 +580,7 @@ function memberButtonHTML(member, groupID, active) {
             <div class="member-meta">${holdings.length} 项持仓</div>
           </div>
         </div>
-        <div class="value">${summary.marketValue ? money(summary.marketValue, summary.currency) : "暂无"}</div>
+        <div class="value">${summary.marketValue ? money(summary.marketValue, "USD") : "暂无"}</div>
       </div>
     </button>
   `;
@@ -589,14 +595,14 @@ function exposureHTML(exposure) {
           <div class="holding-meta">
             <span>${escapeHTML(exposure.symbol)}</span>
             <span>${exposure.holderCount} 人持有</span>
-            <span>${escapeHTML(exposure.currency)}</span>
+            ${sourceCurrencyHTML(exposure.currency)}
           </div>
         </div>
-        <div class="value">${money(exposure.marketValue, exposure.currency)}</div>
+        <div class="value">${money(exposure.marketValue, "USD")}</div>
       </div>
       <div class="row-meta">
         <span>数量 ${formatNumber(exposure.quantity)}</span>
-        <span class="${classForNumber(exposure.pnl)}">${signedMoney(exposure.pnl, exposure.currency)}</span>
+        <span class="${classForNumber(exposure.pnl)}">${signedMoney(exposure.pnl, "USD")}</span>
       </div>
     </article>
   `;
@@ -617,10 +623,11 @@ function eventHTML(event) {
         <div class="row-meta">
           <span>${escapeHTML(event.assetName || event.symbol)}</span>
           <span>${formatDateTime(event.createdAt)}</span>
+          ${sourceCurrencyHTML(event.currency)}
         </div>
         <div class="row-meta">
           <span>数量 ${formatNumber(event.quantity)}</span>
-          <span>现价 ${money(event.lastPrice, event.currency)}</span>
+          <span>现价 ${money(convertMoneyToUSD(event.lastPrice, event.currency), "USD")}</span>
         </div>
       </div>
     </div>
@@ -658,7 +665,7 @@ async function createGroup(formData) {
     await refreshBootstrap();
     state.activeGroupID = result.group.id;
     state.sheet = "";
-    state.message = "群组已创建。";
+    setNotice("success", "群组已创建。");
   });
 }
 
@@ -671,7 +678,7 @@ async function joinGroup(formData) {
     await refreshBootstrap();
     state.activeGroupID = result.group.id;
     state.sheet = "";
-    state.message = "已加入群组。";
+    setNotice("success", "已加入群组。");
   });
 }
 
@@ -694,7 +701,7 @@ async function saveHolding(formData) {
     await refreshBootstrap();
     state.sheet = "";
     state.editHoldingID = "";
-    state.message = "持仓已保存。";
+    setNotice("success", "持仓已保存。");
   });
 }
 
@@ -709,15 +716,14 @@ async function deleteHolding(holdingID) {
       method: "DELETE"
     });
     await refreshBootstrap();
-    state.message = "持仓已删除。";
+    setNotice("success", "持仓已删除。");
   });
 }
 
 async function parseScreenshot(formData, form) {
   const file = form.elements.image.files?.[0];
   if (!file) {
-    state.error = "请选择截图。";
-    render();
+    setNotice("error", "请选择截图。");
     return;
   }
 
@@ -733,7 +739,7 @@ async function parseScreenshot(formData, form) {
       }
     });
     state.drafts = result.holdings ?? [];
-    state.message = result.warnings?.[0] || `识别到 ${state.drafts.length} 条持仓。`;
+    setNotice("success", result.warnings?.[0] || `识别到 ${state.drafts.length} 条持仓。`);
   });
 }
 
@@ -748,8 +754,7 @@ async function importDrafts() {
   ));
 
   if (!importable.length) {
-    state.error = "没有完整的草稿可以导入。";
-    render();
+    setNotice("error", "没有完整的草稿可以导入。");
     return;
   }
 
@@ -773,7 +778,7 @@ async function importDrafts() {
     await refreshBootstrap();
     state.sheet = "";
     state.drafts = [];
-    state.message = `已同步 ${result.summary.snapshotCount} 条持仓，新增 ${result.summary.createdCount}，更新 ${result.summary.updatedCount}，删除 ${result.summary.deletedCount}。`;
+    setNotice("success", `已同步 ${result.summary.snapshotCount} 条持仓，新增 ${result.summary.createdCount}，更新 ${result.summary.updatedCount}，删除 ${result.summary.deletedCount}。`);
   });
 }
 
@@ -788,12 +793,12 @@ async function refreshBootstrap() {
 
 async function runBusy(task) {
   state.busy = true;
-  state.error = "";
+  clearNotice();
   render();
   try {
     await task();
   } catch (error) {
-    state.error = error.message || "操作失败。";
+    setNotice("error", error.message || "操作失败。");
   } finally {
     state.busy = false;
     render();
@@ -872,8 +877,7 @@ function closeSheet() {
   state.sheet = "";
   state.editHoldingID = "";
   state.drafts = [];
-  state.error = "";
-  state.message = "";
+  clearNotice();
   render();
 }
 
@@ -892,7 +896,6 @@ function byUpdatedAt(first, second) {
 }
 
 function visibleSummary(holdings) {
-  let currency = "USD";
   let marketValue = 0;
   let costBasis = 0;
 
@@ -900,15 +903,13 @@ function visibleSummary(holdings) {
     if (!canSeeValues(holding)) {
       continue;
     }
-    currency = holding.currency || currency;
-    marketValue += Number(holding.quantity) * Number(holding.lastPrice);
+    marketValue += holdingMarketValueUSD(holding);
     if (canSeeCost(holding)) {
-      costBasis += Number(holding.quantity) * Number(holding.averageCost);
+      costBasis += holdingCostBasisUSD(holding);
     }
   }
 
   return {
-    currency,
     marketValue,
     pnl: costBasis ? marketValue - costBasis : 0
   };
@@ -931,9 +932,9 @@ function exposureRows(holdings) {
       holderIDs: new Set()
     };
     existing.quantity += Number(holding.quantity);
-    existing.marketValue += Number(holding.quantity) * Number(holding.lastPrice);
+    existing.marketValue += holdingMarketValueUSD(holding);
     if (canSeeCost(holding)) {
-      existing.costBasis += Number(holding.quantity) * Number(holding.averageCost);
+      existing.costBasis += holdingCostBasisUSD(holding);
     }
     existing.holderIDs.add(holding.ownerID);
     grouped.set(key, existing);
@@ -964,6 +965,71 @@ function memberForHolding(holding) {
   return (state.data?.groups ?? [])
     .flatMap((group) => group.members ?? [])
     .find((member) => member.id === holding.ownerID);
+}
+
+function holdingEventsFor(holding) {
+  return (state.data?.holdingEvents ?? [])
+    .filter((event) => event.holdingID === holding.id)
+    .sort((first, second) => new Date(first.createdAt) - new Date(second.createdAt));
+}
+
+function holdingChangeSummary(holding) {
+  const events = holdingEventsFor(holding);
+  const created = events.find((event) => event.type === "created");
+  const updated = [...events].reverse().find((event) => event.type === "updated");
+  const items = [];
+
+  if (created) {
+    items.push(`创建 ${formatDateTime(created.createdAt)}`);
+  }
+
+  if (updated) {
+    items.push(`变更 ${formatDateTime(updated.createdAt)}`);
+  } else if (!created && holding.updatedAt) {
+    items.push(`更新 ${formatDateTime(holding.updatedAt)}`);
+  }
+
+  return items;
+}
+
+function holdingChangeHTML(holding) {
+  const items = holdingChangeSummary(holding);
+  if (!items.length) {
+    return "";
+  }
+
+  return `
+    <div class="holding-change">
+      ${items.map((item) => `<span>${escapeHTML(item)}</span>`).join("")}
+    </div>
+  `;
+}
+
+function fxRateToUSD(currency) {
+  return fxRatesToUSD[currency] ?? 1;
+}
+
+function convertMoneyToUSD(value, currency = "USD") {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return 0;
+  }
+  return number * fxRateToUSD(currency);
+}
+
+function holdingMarketValueUSD(holding) {
+  return convertMoneyToUSD(Number(holding.quantity) * Number(holding.lastPrice), holding.currency);
+}
+
+function holdingCostBasisUSD(holding) {
+  return convertMoneyToUSD(Number(holding.quantity) * Number(holding.averageCost), holding.currency);
+}
+
+function sourceCurrencyHTML(currency) {
+  if (!currency || currency === "USD") {
+    return "";
+  }
+  return `<span>原币 ${escapeHTML(currency)}</span>`;
 }
 
 function holdingPayloadFromForm(formData) {
@@ -1058,11 +1124,50 @@ function registerServiceWorker() {
   }
 }
 
-function noticeHTML() {
-  return [
-    state.error ? `<div class="error">${escapeHTML(state.error)}</div>` : "",
-    state.message ? `<div class="notice">${escapeHTML(state.message)}</div>` : ""
-  ].join("");
+function setNotice(type, text, duration = 2600) {
+  clearNotice();
+  if (!text) {
+    return;
+  }
+
+  state.error = type === "error" ? text : "";
+  state.message = type === "success" ? text : "";
+  armNoticeDismiss(duration);
+  render();
+}
+
+function clearNotice() {
+  if (noticeTimer) {
+    window.clearTimeout(noticeTimer);
+    noticeTimer = 0;
+  }
+  state.error = "";
+  state.message = "";
+}
+
+function armNoticeDismiss(duration = 2600) {
+  if (noticeTimer) {
+    window.clearTimeout(noticeTimer);
+  }
+  noticeTimer = window.setTimeout(() => {
+    state.error = "";
+    state.message = "";
+    noticeTimer = 0;
+    render();
+  }, duration);
+}
+
+function toastHTML() {
+  const text = state.error || state.message;
+  if (!text) {
+    return "";
+  }
+
+  return `
+    <div class="toast-layer" aria-live="polite">
+      <div class="toast ${state.error ? "toast-error" : "toast-success"}">${escapeHTML(text)}</div>
+    </div>
+  `;
 }
 
 function metricHTML(label, value, numericValue = null) {
