@@ -71,6 +71,8 @@ async function servesHealthAndBootstrapData() {
   assert.equal(bootstrap.groups.length, 1);
   assert.equal(bootstrap.holdings.length, 5);
   assert.equal(Array.isArray(bootstrap.holdingEvents), true);
+  assert.equal(Array.isArray(bootstrap.portfolioSnapshots), true);
+  assert.ok(bootstrap.portfolioSnapshots.some((snapshot) => snapshot.ownerID === memberID));
 }
 
 async function signsInAndJoinsGroupByInviteCode() {
@@ -314,6 +316,12 @@ async function syncsSnapshotHoldingsForCurrentMember() {
   assert.ok(events.events.some((event) => event.type === "updated" && event.symbol === "MSFT"));
   assert.ok(events.events.some((event) => event.type === "created" && event.symbol === "AAPL"));
   assert.ok(events.events.some((event) => event.type === "deleted" && event.symbol === "VOO"));
+
+  const bootstrap = await getJson("/api/bootstrap");
+  const memberSnapshots = bootstrap.portfolioSnapshots.filter((snapshot) => snapshot.groupID === groupID && snapshot.ownerID === memberID);
+  assert.equal(memberSnapshots.length >= 2, true);
+  assert.equal(memberSnapshots.at(-1).source, "screenshot");
+  assert.deepEqual(memberSnapshots.at(-1).holdings.map((holding) => holding.symbol), ["AAPL", "MSFT"]);
 }
 
 async function updatesAndDeletesOwnedHolding() {
@@ -358,6 +366,7 @@ async function updatesAndDeletesOwnedHolding() {
   const deleted = await deletedResponse.json();
   assert.equal(deleted.event.type, "deleted");
   assert.equal(deleted.event.symbol, "NVDA");
+  assert.equal(deleted.snapshot.source, "manual");
 
   const events = await getJson(`/api/groups/${groupID}/holding-events`);
   assert.ok(events.events.some((event) => event.type === "updated" && event.symbol === "NVDA"));

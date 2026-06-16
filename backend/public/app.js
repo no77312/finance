@@ -201,7 +201,7 @@ function renderLogin() {
 }
 
 function renderApp() {
-  const data = state.data ?? { groups: [], holdings: [], holdingEvents: [] };
+  const data = state.data ?? { groups: [], holdings: [], holdingEvents: [], portfolioSnapshots: [] };
   const groups = data.groups ?? [];
   const activeGroup = activeGroupFor(groups);
   const user = state.session.user ?? data.user;
@@ -302,7 +302,6 @@ function membersHTML(group) {
   const selectedID = state.selectedMemberID || group.members?.[0]?.id || "";
   state.selectedMemberID = selectedID;
   const selectedMember = group.members?.find((member) => member.id === selectedID);
-  const holdings = groupHoldings(group.id).filter((holding) => holding.ownerID === selectedID);
 
   return `
     <main class="content">
@@ -315,21 +314,14 @@ function membersHTML(group) {
           ${(group.members ?? []).map((member) => memberButtonHTML(member, group.id, member.id === selectedID)).join("")}
         </div>
       </section>
-      <section class="section">
-        <div class="section-header">
-          <h2 class="section-title">${escapeHTML(selectedMember?.displayName || "成员持仓")}</h2>
-          <span class="subtle">${holdings.length} 项</span>
-        </div>
-        <div class="list">
-          ${holdings.length ? holdings.map((holding) => holdingHTML(holding)).join("") : `<div class="empty">这个成员还没有提交持仓。</div>`}
-        </div>
-      </section>
+      ${portfolioSectionHTML(group, selectedID, {
+        title: selectedMember?.displayName || "成员持仓"
+      })}
     </main>
   `;
 }
 
 function mineHTML(group) {
-  const mine = groupHoldings(group.id).filter((holding) => holding.ownerID === state.session.currentMemberID);
   const events = (state.data?.holdingEvents ?? [])
     .filter((event) => event.groupID === group.id && event.ownerID === state.session.currentMemberID)
     .sort((first, second) => new Date(second.createdAt) - new Date(first.createdAt))
@@ -337,15 +329,11 @@ function mineHTML(group) {
 
   return `
     <main class="content">
-      <section class="section">
-        <div class="section-header">
-          <h2 class="section-title">我的持仓</h2>
-          <button class="primary-button" type="button" data-action="sheet" data-value="submit">提交持仓</button>
-        </div>
-        <div class="list">
-          ${mine.length ? mine.map((holding) => holdingHTML(holding, { editable: true })).join("") : `<div class="empty">你还没有在这个群组提交持仓。</div>`}
-        </div>
-      </section>
+      ${portfolioSectionHTML(group, state.session.currentMemberID, {
+        title: "我的持仓",
+        editable: true,
+        actionLabel: "提交持仓"
+      })}
       <section class="section">
         <div class="section-header">
           <h2 class="section-title">变动记录</h2>
@@ -358,6 +346,30 @@ function mineHTML(group) {
         </div>
       </section>
     </main>
+  `;
+}
+
+function portfolioSectionHTML(group, ownerID, options = {}) {
+  const holdings = groupHoldings(group.id).filter((holding) => holding.ownerID === ownerID);
+  const insights = buildPortfolioInsights(group.id, ownerID, holdings);
+
+  return `
+    <section class="section">
+      <div class="section-header">
+        <h2 class="section-title">${escapeHTML(options.title || "持仓")}</h2>
+        ${options.actionLabel ? `<button class="primary-button" type="button" data-action="sheet" data-value="submit">${escapeHTML(options.actionLabel)}</button>` : `<span class="subtle">${holdings.length} 项</span>`}
+      </div>
+      ${portfolioSummaryHTML(insights)}
+      <div class="list">
+        ${holdings.length
+          ? insights.sortedHoldings.map((holding) => holdingHTML(holding, {
+            editable: options.editable,
+            emphasizeWeight: true,
+            portfolio: insights.statsByHoldingID.get(holding.id)
+          })).join("")
+          : `<div class="empty">${options.editable ? "你还没有在这个群组提交持仓。" : "这个成员还没有提交持仓。"}</div>`}
+      </div>
+    </section>
   `;
 }
 
@@ -508,6 +520,8 @@ function holdingHTML(holding, options = {}) {
   const marketValue = holdingMarketValueUSD(holding);
   const costBasis = holdingCostBasisUSD(holding);
   const pnl = marketValue - costBasis;
+  const portfolio = options.portfolio ?? null;
+  const emphasizeWeight = Boolean(options.emphasizeWeight && portfolio);
 
   return `
     <article class="list-item">
@@ -522,8 +536,13 @@ function holdingHTML(holding, options = {}) {
             ${privacyPillHTML(holding)}
           </div>
         </div>
-        <div class="value">
-          ${showValues ? money(marketValue, "USD") : "仅标的"}
+        <div class="${emphasizeWeight ? "value-stack" : "value"}">
+          ${emphasizeWeight
+            ? `
+              <div class="weight-value">${escapeHTML(weightHeadline(portfolio))}</div>
+              <div class="value-caption">${showValues ? money(marketValue, "USD") : "仅标的"}</div>
+            `
+            : `${showValues ? money(marketValue, "USD") : "仅标的"}`}
         </div>
       </div>
       <div class="row-meta">
@@ -531,6 +550,7 @@ function holdingHTML(holding, options = {}) {
         ${showCost ? `<span>成本 ${money(convertMoneyToUSD(holding.averageCost, holding.currency), "USD")}</span><span class="${classForNumber(pnl)}">${signedMoney(pnl, "USD")}</span>` : ""}
         ${holding.priceDate ? `<span>收盘价 ${escapeHTML(holding.priceDate)}</span>` : ""}
       </div>
+      ${emphasizeWeight ? holdingWeightHTML(portfolio) : ""}
       ${holdingChangeHTML(holding)}
       ${options.editable ? `
         <div class="actions">
@@ -869,7 +889,8 @@ function normalizeBootstrap(data) {
     user: data?.user ?? state.session?.user ?? null,
     groups: data?.groups ?? [],
     holdings: data?.holdings ?? [],
-    holdingEvents: data?.holdingEvents ?? []
+    holdingEvents: data?.holdingEvents ?? [],
+    portfolioSnapshots: data?.portfolioSnapshots ?? []
   };
 }
 
@@ -1003,6 +1024,299 @@ function holdingChangeHTML(holding) {
       ${items.map((item) => `<span>${escapeHTML(item)}</span>`).join("")}
     </div>
   `;
+}
+
+function portfolioSummaryHTML(insights) {
+  if (!insights.totalCount) {
+    return "";
+  }
+
+  return `
+    <div class="panel portfolio-summary">
+      <div class="portfolio-stat-grid">
+        ${portfolioStatHTML("最大仓位", formatPercent(insights.maxWeight))}
+        ${portfolioStatHTML("前三集中", formatPercent(insights.top3Weight))}
+        ${portfolioStatHTML("本次变化", insights.previousSnapshotAt ? `${insights.changeCount} 项` : "首版")}
+        ${portfolioStatHTML("退出仓位", insights.previousSnapshotAt ? `${insights.removedCount} 项` : "0 项")}
+      </div>
+      ${allocationStripHTML(insights.topSlices)}
+      <div class="portfolio-note">
+        <span>${escapeHTML(portfolioCoverageCopy(insights))}</span>
+        <span>${escapeHTML(portfolioComparisonCopy(insights))}</span>
+      </div>
+    </div>
+  `;
+}
+
+function portfolioStatHTML(label, value) {
+  return `
+    <div class="portfolio-stat">
+      <div class="portfolio-stat-label">${escapeHTML(label)}</div>
+      <div class="portfolio-stat-value">${escapeHTML(value)}</div>
+    </div>
+  `;
+}
+
+function allocationStripHTML(slices) {
+  if (!slices.length) {
+    return "";
+  }
+
+  return `
+    <div class="allocation-wrap">
+      <div class="allocation-strip" aria-label="仓位分布">
+        ${slices.map((slice, index) => `
+          <div
+            class="allocation-segment tone-${index % 6}"
+            style="width: ${Math.max(slice.weight * 100, 0)}%;"
+            title="${escapeAttr(`${slice.symbol} ${formatPercent(slice.weight)}`)}"
+          ></div>
+        `).join("")}
+      </div>
+      <div class="allocation-legend">
+        ${slices.slice(0, 4).map((slice, index) => `
+          <span class="legend-chip tone-${index % 6}">
+            <strong>${escapeHTML(slice.symbol)}</strong>
+            <span>${escapeHTML(formatPercent(slice.weight))}</span>
+          </span>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function buildPortfolioInsights(groupID, ownerID, holdings = []) {
+  const currentContext = currentPortfolioContext(holdings);
+  const snapshots = portfolioSnapshotsFor(groupID, ownerID);
+  const previousSnapshot = snapshots.length > 1 ? snapshots[snapshots.length - 2] : null;
+  const hasPreviousSnapshot = Boolean(previousSnapshot);
+  const previousContext = previousSnapshot ? snapshotPortfolioContext(previousSnapshot) : emptyPortfolioContext();
+  const currentSymbols = new Set(holdings.map((holding) => holding.symbol));
+  const sortedVisible = [...currentContext.rows].sort((first, second) => second.weight - first.weight);
+  const sortedHoldings = holdings.slice().sort((first, second) => {
+    const firstWeight = currentContext.byHoldingID.get(first.id)?.weight ?? -1;
+    const secondWeight = currentContext.byHoldingID.get(second.id)?.weight ?? -1;
+    if (secondWeight !== firstWeight) {
+      return secondWeight - firstWeight;
+    }
+    return byUpdatedAt(first, second);
+  });
+
+  const statsByHoldingID = new Map();
+  let changeCount = 0;
+
+  for (const holding of sortedHoldings) {
+    const current = currentContext.byHoldingID.get(holding.id) ?? {
+      marketValue: 0,
+      weight: null
+    };
+    const previousWeight = previousContext.byHoldingID.get(holding.id) ?? previousContext.bySymbol.get(holding.symbol) ?? null;
+    const delta = current.weight === null || previousWeight === null ? null : current.weight - previousWeight;
+    const status = weightStatus(current.weight, previousWeight, delta, hasPreviousSnapshot);
+
+    if (hasPreviousSnapshot && (status === "new" || status === "up" || status === "down")) {
+      changeCount += 1;
+    }
+
+    statsByHoldingID.set(holding.id, {
+      marketValue: current.marketValue,
+      weight: current.weight,
+      previousWeight,
+      delta,
+      status
+    });
+  }
+
+  let removedCount = 0;
+  if (hasPreviousSnapshot) {
+    for (const symbol of previousContext.bySymbol.keys()) {
+      if (!currentSymbols.has(symbol)) {
+        removedCount += 1;
+      }
+    }
+  }
+
+  return {
+    totalCount: holdings.length,
+    visibleCount: currentContext.rows.length,
+    hiddenCount: holdings.length - currentContext.rows.length,
+    totalVisibleValue: currentContext.totalVisibleValue,
+    maxWeight: sortedVisible[0]?.weight ?? 0,
+    top3Weight: sortedVisible.slice(0, 3).reduce((sum, row) => sum + row.weight, 0),
+    changeCount,
+    removedCount,
+    latestSnapshotAt: snapshots[snapshots.length - 1]?.createdAt ?? null,
+    previousSnapshotAt: previousSnapshot?.createdAt ?? null,
+    topSlices: sortedVisible.slice(0, 6),
+    sortedHoldings,
+    statsByHoldingID
+  };
+}
+
+function portfolioSnapshotsFor(groupID, ownerID) {
+  return (state.data?.portfolioSnapshots ?? [])
+    .filter((snapshot) => snapshot.groupID === groupID && snapshot.ownerID === ownerID)
+    .sort((first, second) => new Date(first.createdAt ?? 0) - new Date(second.createdAt ?? 0));
+}
+
+function currentPortfolioContext(holdings) {
+  const visibleHoldings = holdings.filter((holding) => canSeeValues(holding));
+  const totalVisibleValue = visibleHoldings.reduce((sum, holding) => sum + holdingMarketValueUSD(holding), 0);
+  const byHoldingID = new Map();
+  const bySymbol = new Map();
+  const rowsBySymbol = new Map();
+
+  for (const holding of visibleHoldings) {
+    const marketValue = holdingMarketValueUSD(holding);
+    const weight = totalVisibleValue > 0 ? marketValue / totalVisibleValue : 0;
+    byHoldingID.set(holding.id, { marketValue, weight });
+    bySymbol.set(holding.symbol, (bySymbol.get(holding.symbol) ?? 0) + weight);
+    const row = rowsBySymbol.get(holding.symbol) ?? {
+      symbol: holding.symbol,
+      assetName: holding.assetName,
+      marketValue: 0,
+      weight: 0
+    };
+    row.marketValue += marketValue;
+    row.weight += weight;
+    rowsBySymbol.set(holding.symbol, row);
+  }
+
+  return {
+    totalVisibleValue,
+    byHoldingID,
+    bySymbol,
+    rows: Array.from(rowsBySymbol.values())
+  };
+}
+
+function snapshotPortfolioContext(snapshot) {
+  const visibleHoldings = (snapshot.holdings ?? []).filter((holding) => canSeeSnapshotValues(snapshot, holding));
+  const totalVisibleValue = visibleHoldings.reduce((sum, holding) => sum + snapshotHoldingMarketValueUSD(holding), 0);
+  const byHoldingID = new Map();
+  const bySymbol = new Map();
+
+  for (const holding of visibleHoldings) {
+    const marketValue = snapshotHoldingMarketValueUSD(holding);
+    const weight = totalVisibleValue > 0 ? marketValue / totalVisibleValue : 0;
+    byHoldingID.set(holding.holdingID, weight);
+    bySymbol.set(holding.symbol, (bySymbol.get(holding.symbol) ?? 0) + weight);
+  }
+
+  return {
+    totalVisibleValue,
+    byHoldingID,
+    bySymbol
+  };
+}
+
+function emptyPortfolioContext() {
+  return {
+    totalVisibleValue: 0,
+    byHoldingID: new Map(),
+    bySymbol: new Map(),
+    rows: []
+  };
+}
+
+function canSeeSnapshotValues(snapshot, holding) {
+  return snapshot.ownerID === state.session?.currentMemberID || holding.visibility !== "symbolOnly";
+}
+
+function snapshotHoldingMarketValueUSD(holding) {
+  return convertMoneyToUSD(Number(holding.quantity) * Number(holding.lastPrice), holding.currency);
+}
+
+function weightStatus(weight, previousWeight, delta, hasPreviousSnapshot = true) {
+  if (!hasPreviousSnapshot) {
+    return weight === null ? "hidden" : "initial";
+  }
+  if (weight === null) {
+    return "hidden";
+  }
+  if (previousWeight === null) {
+    return "new";
+  }
+  if (Math.abs(delta ?? 0) < 0.001) {
+    return "flat";
+  }
+  return delta > 0 ? "up" : "down";
+}
+
+function weightHeadline(portfolio) {
+  if (!portfolio || portfolio.weight === null) {
+    return "不可见";
+  }
+  return formatPercent(portfolio.weight);
+}
+
+function holdingWeightHTML(portfolio) {
+  if (!portfolio) {
+    return "";
+  }
+
+  const chips = [];
+  if (portfolio.weight === null) {
+    chips.push(`<span class="weight-chip">仓位不可见</span>`);
+  } else {
+    chips.push(`<span class="weight-chip strong">占比 ${escapeHTML(formatPercent(portfolio.weight))}</span>`);
+  }
+
+  const deltaLabel = weightDeltaLabel(portfolio);
+  if (deltaLabel) {
+    chips.push(`<span class="weight-chip ${weightChipTone(portfolio.status)}">${escapeHTML(deltaLabel)}</span>`);
+  }
+
+  return `
+    <div class="weight-summary">
+      ${chips.join("")}
+    </div>
+    ${portfolio.weight === null ? "" : `
+      <div class="weight-bar" aria-hidden="true">
+        <div class="weight-fill ${weightChipTone(portfolio.status)}" style="width: ${Math.max(0, Math.min(portfolio.weight * 100, 100))}%;"></div>
+      </div>
+    `}
+  `;
+}
+
+function weightDeltaLabel(portfolio) {
+  if (!portfolio || portfolio.weight === null) {
+    return "";
+  }
+  if (portfolio.status === "initial") {
+    return "";
+  }
+  if (portfolio.previousWeight === null) {
+    return "新进仓位";
+  }
+  if (portfolio.status === "flat") {
+    return "较上次持平";
+  }
+  return `较上次 ${signedPercentPoint(portfolio.delta)}`;
+}
+
+function weightChipTone(status) {
+  if (status === "up" || status === "new") {
+    return "positive";
+  }
+  if (status === "down") {
+    return "negative";
+  }
+  return "";
+}
+
+function portfolioCoverageCopy(insights) {
+  if (insights.hiddenCount > 0) {
+    return `按可见市值计算，隐藏 ${insights.hiddenCount} 项未纳入占比。`;
+  }
+  return "按当前可见市值计算。";
+}
+
+function portfolioComparisonCopy(insights) {
+  if (!insights.previousSnapshotAt) {
+    return insights.latestSnapshotAt ? `最新快照 ${formatDateTime(insights.latestSnapshotAt)}` : "等待下一次提交形成对比。";
+  }
+  return `对比 ${formatDateTime(insights.previousSnapshotAt)} 的上一版组合。`;
 }
 
 function fxRateToUSD(currency) {
@@ -1278,6 +1592,33 @@ function signedMoney(value, currency = "USD") {
     return `-${formatted}`;
   }
   return formatted;
+}
+
+function formatPercent(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return "-";
+  }
+  return new Intl.NumberFormat("zh-CN", {
+    style: "percent",
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1
+  }).format(number);
+}
+
+function signedPercentPoint(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return "-";
+  }
+  const absolute = `${formatPercent(Math.abs(number))}`;
+  if (number > 0) {
+    return `+${absolute}`;
+  }
+  if (number < 0) {
+    return `-${absolute}`;
+  }
+  return absolute;
 }
 
 function formatNumber(value) {

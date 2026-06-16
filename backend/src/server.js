@@ -285,9 +285,12 @@ async function routeRequest(request, response, store, context) {
       data.holdings.push(nextHolding);
       const event = createHoldingEvent("created", nextHolding);
       appendHoldingEvent(data, event);
+      const snapshot = createPortfolioSnapshot(data, groupID, memberID, "manual");
+      appendPortfolioSnapshot(data, snapshot);
       return {
         holding: nextHolding,
-        event
+        event,
+        snapshot
       };
     });
     return send(response, 201, result);
@@ -355,11 +358,15 @@ async function routeRequest(request, response, store, context) {
         appendHoldingEvent(data, event);
       }
 
+      const snapshot = createPortfolioSnapshot(data, groupID, memberID, "screenshot");
+      appendPortfolioSnapshot(data, snapshot);
+
       return {
         created,
         updated,
         deleted,
         events,
+        snapshot,
         summary: {
           createdCount: created.length,
           updatedCount: updated.length,
@@ -390,9 +397,12 @@ async function routeRequest(request, response, store, context) {
       data.holdings[index] = nextHolding;
       const event = createHoldingEvent("updated", nextHolding, previousHolding);
       appendHoldingEvent(data, event);
+      const snapshot = createPortfolioSnapshot(data, groupID, memberID, "manual");
+      appendPortfolioSnapshot(data, snapshot);
       return {
         holding: nextHolding,
-        event
+        event,
+        snapshot
       };
     });
     return send(response, 200, result);
@@ -414,9 +424,14 @@ async function routeRequest(request, response, store, context) {
       const event = createHoldingEvent("deleted", holding);
       data.holdings = data.holdings.filter((candidate) => candidate.id !== holdingID);
       appendHoldingEvent(data, event);
-      return event;
+      const snapshot = createPortfolioSnapshot(data, groupID, memberID, "manual");
+      appendPortfolioSnapshot(data, snapshot);
+      return {
+        event,
+        snapshot
+      };
     });
-    return send(response, 200, { event });
+    return send(response, 200, event);
   }
 
   throw notFound("ROUTE_NOT_FOUND", "Route not found.");
@@ -474,7 +489,8 @@ function bootstrapForMember(data, memberID, knownUser = undefined, sessionToken 
     currentMemberID: memberID,
     groups,
     holdings: data.holdings.filter((holding) => groupIDs.has(holding.groupID)),
-    holdingEvents: data.holdingEvents.filter((event) => groupIDs.has(event.groupID))
+    holdingEvents: data.holdingEvents.filter((event) => groupIDs.has(event.groupID)),
+    portfolioSnapshots: (data.portfolioSnapshots ?? []).filter((snapshot) => groupIDs.has(snapshot.groupID))
   };
 
   if (sessionToken) {
@@ -591,6 +607,54 @@ function appendHoldingEvent(data, event) {
   data.holdingEvents ??= [];
   data.holdingEvents.push(event);
   data.holdingEvents = data.holdingEvents.slice(-500);
+}
+
+function createPortfolioSnapshot(data, groupID, ownerID, source = "manual") {
+  return {
+    id: randomUUID().toUpperCase(),
+    groupID,
+    ownerID,
+    source,
+    createdAt: new Date().toISOString(),
+    holdings: data.holdings
+      .filter((holding) => holding.groupID === groupID && holding.ownerID === ownerID)
+      .sort((first, second) => first.symbol.localeCompare(second.symbol))
+      .map((holding) => snapshotHoldingFromHolding(holding))
+  };
+}
+
+function appendPortfolioSnapshot(data, snapshot) {
+  data.portfolioSnapshots ??= [];
+
+  const matchesSnapshot = (candidate) => (
+    candidate.groupID === snapshot.groupID
+    && candidate.ownerID === snapshot.ownerID
+  );
+
+  const history = data.portfolioSnapshots
+    .filter(matchesSnapshot)
+    .sort((first, second) => new Date(first.createdAt ?? 0) - new Date(second.createdAt ?? 0))
+    .slice(-59);
+
+  const others = data.portfolioSnapshots.filter((candidate) => !matchesSnapshot(candidate));
+  data.portfolioSnapshots = [...others, ...history, snapshot]
+    .sort((first, second) => new Date(first.createdAt ?? 0) - new Date(second.createdAt ?? 0));
+}
+
+function snapshotHoldingFromHolding(holding) {
+  return {
+    holdingID: holding.id,
+    symbol: holding.symbol,
+    assetName: holding.assetName,
+    market: holding.market,
+    quantity: Number(holding.quantity),
+    averageCost: Number(holding.averageCost),
+    lastPrice: Number(holding.lastPrice),
+    currency: holding.currency,
+    visibility: holding.visibility,
+    note: holding.note ?? "",
+    updatedAt: holding.updatedAt ?? null
+  };
 }
 
 function normalizeSnapshotHoldings(holdings, groupID, memberID) {
