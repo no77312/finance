@@ -344,10 +344,13 @@ function membersHTML(group) {
   const selectedMember = group.members?.find((member) => member.id === selectedID);
 
   return `
-    <main class="content">
+    <main class="content member-layout">
       <section class="section">
         <div class="section-header">
-          <h2 class="section-title">成员</h2>
+          <div class="section-header-copy">
+            <h2 class="section-title">成员</h2>
+            <div class="subtle">快速比较每个人的组合结构</div>
+          </div>
           <span class="subtle">${group.members?.length ?? 0} 人</span>
         </div>
         <div class="list">
@@ -355,7 +358,8 @@ function membersHTML(group) {
         </div>
       </section>
       ${portfolioSectionHTML(group, selectedID, {
-        title: selectedMember?.displayName || "成员持仓"
+        title: selectedMember?.displayName || "成员持仓",
+        owner: selectedMember
       })}
     </main>
   `;
@@ -425,7 +429,10 @@ function portfolioSectionHTML(group, ownerID, options = {}) {
         <h2 class="section-title">${escapeHTML(options.title || "持仓")}</h2>
         ${options.actionLabel ? `<button class="primary-button" type="button" data-action="sheet" data-value="submit">${escapeHTML(options.actionLabel)}</button>` : `<span class="subtle">${holdings.length} 项</span>`}
       </div>
-      ${portfolioSummaryHTML(insights)}
+      ${portfolioSummaryHTML(insights, {
+        owner: options.owner,
+        holdings
+      })}
       <div class="list">
         ${holdings.length
           ? insights.sortedHoldings.map((holding) => holdingHTML(holding, {
@@ -827,8 +834,10 @@ function holdingDraftHTML(draft) {
 function memberButtonHTML(member, groupID, active) {
   const holdings = groupHoldings(groupID).filter((holding) => holding.ownerID === member.id);
   const summary = visibleSummary(holdings);
+  const insights = buildPortfolioInsights(groupID, member.id, holdings);
+  const latestActivity = latestActivityAt(holdings, insights.latestSnapshotAt);
   return `
-    <button class="list-item member-row ${active ? "active" : ""}" type="button" data-action="select-member" data-value="${escapeAttr(member.id)}">
+    <button class="list-item member-list-card ${active ? "active" : ""}" type="button" data-action="select-member" data-value="${escapeAttr(member.id)}">
       <div class="member-row">
         <div class="account">
           ${avatarHTML(member)}
@@ -837,7 +846,15 @@ function memberButtonHTML(member, groupID, active) {
             <div class="member-meta">${holdings.length} 项持仓</div>
           </div>
         </div>
-        <div class="value">${summary.marketValue ? money(summary.marketValue, "USD") : "暂无"}</div>
+        <div class="value-stack">
+          <div class="member-list-value">${summary.marketValue ? money(summary.marketValue, "USD") : "暂无"}</div>
+          <div class="value-caption">${escapeHTML(memberOverviewWeightCopy(holdings, insights))}</div>
+        </div>
+      </div>
+      ${miniAllocationHTML(insights.topSlices, "member-list-strip")}
+      <div class="member-list-footer">
+        <span>${escapeHTML(memberOverviewConcentrationCopy(holdings, insights))}</span>
+        <span>${latestActivity ? formatDateTime(latestActivity) : "暂无更新"}</span>
       </div>
     </button>
   `;
@@ -950,6 +967,7 @@ function snapshotUpdateHTML(summary) {
           <span class="subtle">${escapeHTML(formatDateTime(summary.snapshot.createdAt))}</span>
         </div>
       </div>
+      ${summary.primaryChange ? snapshotHighlightHTML(summary.primaryChange) : ""}
       <div class="weight-summary">
         ${summary.summaryChips.length ? summary.summaryChips.map((chip) => `
           <span class="weight-chip ${escapeAttr(chip.tone)}">${escapeHTML(chip.label)}</span>
@@ -963,12 +981,25 @@ function snapshotUpdateHTML(summary) {
   `;
 }
 
+function snapshotHighlightHTML(change) {
+  const tone = changeToneClass(change.status);
+  return `
+    <div class="snapshot-highlight ${tone}">
+      <div class="min-w-0">
+        <div class="snapshot-highlight-label">主要变化</div>
+        <div class="snapshot-highlight-title">${escapeHTML(change.assetName || change.symbol)}</div>
+        <div class="snapshot-highlight-meta">${escapeHTML(change.symbol)} · ${escapeHTML(change.statusLabel)}</div>
+      </div>
+      <div class="snapshot-highlight-value">
+        <strong>${escapeHTML(formatPercent(change.beforeWeight))} -> ${escapeHTML(formatPercent(change.afterWeight))}</strong>
+        <span>${escapeHTML(signedPercentPoint(change.delta))}</span>
+      </div>
+    </div>
+  `;
+}
+
 function snapshotChangeRowHTML(change) {
-  const tone = change.status === "up" || change.status === "new"
-    ? "positive"
-    : change.status === "down" || change.status === "removed"
-      ? "negative"
-      : "";
+  const tone = changeToneClass(change.status);
 
   return `
     <div class="snapshot-change-row">
@@ -977,10 +1008,21 @@ function snapshotChangeRowHTML(change) {
         <span>${escapeHTML(change.symbol)} · ${escapeHTML(change.statusLabel)}</span>
       </div>
       <div class="snapshot-change-values ${tone}">
-        ${escapeHTML(formatPercent(change.beforeWeight))} -> ${escapeHTML(formatPercent(change.afterWeight))}
+        <strong>${escapeHTML(formatPercent(change.beforeWeight))} -> ${escapeHTML(formatPercent(change.afterWeight))}</strong>
+        <span>${escapeHTML(signedPercentPoint(change.delta))}</span>
       </div>
     </div>
   `;
+}
+
+function changeToneClass(status) {
+  if (status === "up" || status === "new") {
+    return "positive";
+  }
+  if (status === "down" || status === "removed") {
+    return "negative";
+  }
+  return "";
 }
 
 function eventHTML(event) {
@@ -1455,6 +1497,7 @@ function snapshotSummary(snapshot) {
         ...row,
         beforeWeight: 0,
         afterWeight: row.weight,
+        delta: row.weight,
         status: "new",
         statusLabel: "首次出现"
       })),
@@ -1464,6 +1507,14 @@ function snapshotSummary(snapshot) {
           tone: ""
         }
       ],
+      primaryChange: currentRows[0] ? {
+        ...currentRows[0],
+        beforeWeight: 0,
+        afterWeight: currentRows[0].weight,
+        delta: currentRows[0].weight,
+        status: "new",
+        statusLabel: "首次出现"
+      } : null,
       note: hiddenCount > 0 ? `另有 ${hiddenCount} 项仅公开标的，未纳入仓位占比。` : "",
       sourceLabel,
       sourceTone
@@ -1479,6 +1530,7 @@ function snapshotSummary(snapshot) {
     owner,
     previousSnapshot,
     rows: changes.slice(0, 5),
+    primaryChange: changes[0] ?? null,
     summaryChips: snapshotSummaryChips(counts),
     note: hiddenCount > 0 ? `本次有 ${hiddenCount} 项仅公开标的，未纳入仓位占比变化。` : "",
     sourceLabel,
@@ -1566,26 +1618,63 @@ function snapshotSummaryChips(counts) {
   return chips;
 }
 
-function portfolioSummaryHTML(insights) {
+function portfolioSummaryHTML(insights, options = {}) {
   if (!insights.totalCount) {
     return "";
   }
 
+  const topSlice = insights.topSlices[0] ?? null;
+  const owner = options.owner ?? null;
+  const holdings = options.holdings ?? [];
+  const summary = visibleSummary(holdings);
+  const primaryValue = owner ? memberPrimaryValue(summary, holdings, insights) : money(insights.totalVisibleValue, "USD");
+
   return `
     <div class="panel portfolio-summary">
-      <div class="portfolio-stat-grid">
-        ${portfolioStatHTML("最大仓位", formatPercent(insights.maxWeight))}
+      ${owner ? `
+        <div class="portfolio-owner-row">
+          <div class="account">
+            ${avatarHTML(owner)}
+            <div class="min-w-0">
+              <div class="account-name">${escapeHTML(owner.displayName)}</div>
+              <div class="account-mail">${escapeHTML(memberOverviewCaption(holdings, insights))}</div>
+            </div>
+          </div>
+          <div class="value-stack">
+            <div class="member-overview-value">${escapeHTML(primaryValue)}</div>
+            <div class="value-caption">${escapeHTML(portfolioFreshnessCopy(insights, holdings))}</div>
+          </div>
+        </div>
+      ` : ""}
+      <div class="portfolio-focus">
+        <div class="min-w-0">
+          <div class="portfolio-focus-label">当前主仓位</div>
+          <div class="portfolio-focus-title">${topSlice ? escapeHTML(topSlice.symbol) : "暂无公开仓位"}</div>
+          <div class="subtle">${topSlice ? escapeHTML(topSlice.assetName || topSlice.symbol) : escapeHTML(portfolioCoverageCopy(insights))}</div>
+        </div>
+        <div class="value-stack">
+          <div class="weight-value">${topSlice ? escapeHTML(formatPercent(topSlice.weight)) : "-"}</div>
+          <div class="value-caption">最大仓位</div>
+        </div>
+      </div>
+      ${allocationStripHTML(insights.topSlices)}
+      <div class="portfolio-stat-grid portfolio-stat-grid-compact">
+        ${portfolioStatHTML("公开持仓", `${insights.visibleCount}/${insights.totalCount}`)}
         ${portfolioStatHTML("前三集中", formatPercent(insights.top3Weight))}
         ${portfolioStatHTML("本次变化", insights.previousSnapshotAt ? `${insights.changeCount} 项` : "首版")}
         ${portfolioStatHTML("退出仓位", insights.previousSnapshotAt ? `${insights.removedCount} 项` : "0 项")}
       </div>
-      ${allocationStripHTML(insights.topSlices)}
       <div class="portfolio-note">
         <span>${escapeHTML(portfolioCoverageCopy(insights))}</span>
         <span>${escapeHTML(portfolioComparisonCopy(insights))}</span>
       </div>
     </div>
   `;
+}
+
+function portfolioFreshnessCopy(insights, holdings) {
+  const latest = latestActivityAt(holdings, insights.latestSnapshotAt);
+  return latest ? `更新 ${formatDateTime(latest)}` : "暂无更新";
 }
 
 function portfolioStatHTML(label, value) {

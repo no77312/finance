@@ -434,12 +434,34 @@ button.list-item.active {
   background: var(--accent-soft);
 }
 
+.member-list-card {
+  gap: 12px;
+}
+
 .holding-row,
 .member-row {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 10px;
   align-items: center;
+}
+
+.member-list-value {
+  font-size: 18px;
+  line-height: 1.1;
+  font-weight: 800;
+}
+
+.member-list-strip {
+  height: 8px;
+}
+
+.member-list-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .holding-card {
@@ -590,6 +612,47 @@ button.list-item.active {
 
 .portfolio-summary {
   gap: 16px;
+}
+
+.portfolio-owner-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.portfolio-focus {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, #fbfbfd 0%, #f5f7fb 100%);
+  border: 1px solid rgba(229, 229, 234, 0.78);
+}
+
+.portfolio-focus-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.portfolio-focus-title {
+  margin-top: 3px;
+  font-size: 24px;
+  line-height: 1.05;
+  font-weight: 820;
+  overflow-wrap: anywhere;
+}
+
+.portfolio-stat-grid-compact .portfolio-stat {
+  padding: 12px;
+  border-radius: 18px;
+}
+
+.portfolio-stat-grid-compact .portfolio-stat-value {
+  font-size: 18px;
 }
 
 .section-wide {
@@ -1117,6 +1180,68 @@ button.list-item.active {
   text-align: right;
 }
 
+.snapshot-highlight {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 24px;
+  background: #f7f7fb;
+  border: 1px solid rgba(229, 229, 234, 0.78);
+}
+
+.snapshot-highlight.positive {
+  background: var(--green-soft);
+  border-color: #ccefd7;
+  color: var(--ink);
+}
+
+.snapshot-highlight.negative {
+  background: var(--red-soft);
+  border-color: #ffd1cf;
+  color: var(--ink);
+}
+
+.snapshot-highlight-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.snapshot-highlight-title {
+  margin-top: 3px;
+  font-size: 18px;
+  line-height: 1.15;
+  font-weight: 780;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.snapshot-highlight-meta {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.snapshot-highlight-value {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.snapshot-highlight-value strong {
+  font-size: 17px;
+}
+
+.snapshot-highlight-value span {
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .snapshot-change-list {
   display: grid;
   gap: 10px;
@@ -1153,10 +1278,21 @@ button.list-item.active {
 }
 
 .snapshot-change-values {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
   text-align: right;
+  white-space: nowrap;
+}
+
+.snapshot-change-values strong {
   font-size: 15px;
   font-weight: 760;
-  white-space: nowrap;
+}
+
+.snapshot-change-values span {
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .snapshot-empty {
@@ -1319,15 +1455,19 @@ button.list-item.active {
 
   .overview-heading,
   .holding-card-head,
+  .portfolio-owner-row,
+  .portfolio-focus,
   .profile-card-head,
   .member-overview-head,
   .snapshot-card-head,
+  .snapshot-highlight,
   .group-menu-item {
     grid-template-columns: 1fr;
   }
 
   .holding-card-side,
-  .snapshot-meta {
+  .snapshot-meta,
+  .snapshot-highlight-value {
     justify-items: start;
     text-align: left;
   }
@@ -1337,12 +1477,18 @@ button.list-item.active {
   }
 
   .snapshot-change-values {
+    justify-items: start;
     text-align: left;
   }
 
   .group-overview-note,
   .section-header {
     align-items: start;
+  }
+
+  .member-list-footer {
+    display: grid;
+    gap: 4px;
   }
 }
 
