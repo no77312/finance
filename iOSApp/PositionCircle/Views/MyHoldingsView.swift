@@ -5,6 +5,8 @@ struct MyHoldingsView: View {
     let group: InvestmentGroup
     var onEditHolding: (Holding) -> Void
 
+    @State private var isRefreshingPrices = false
+
     private var myHoldings: [Holding] {
         store.currentMemberHoldings(in: group)
     }
@@ -19,7 +21,21 @@ struct MyHoldingsView: View {
                         subtitle: "点击右上角加号添加你的第一笔持仓"
                     )
                 } else {
-                    SectionTitle(title: "我的持仓", systemImage: "person.crop.circle.fill")
+                    HStack(spacing: 8) {
+                        Image(systemName: "person.crop.circle.fill")
+                            .foregroundStyle(.blue)
+                        Text("我的持仓")
+                            .font(.headline)
+                        Spacer()
+                        Button {
+                            refreshPrices()
+                        } label: {
+                            Label("刷新收盘价", systemImage: "arrow.clockwise")
+                                .labelStyle(.iconOnly)
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(isRefreshingPrices || store.isSyncing)
+                    }
                     VStack(spacing: 10) {
                         ForEach(myHoldings) { holding in
                             HoldingRow(
@@ -37,5 +53,13 @@ struct MyHoldingsView: View {
             .padding(16)
         }
         .background(Color(.systemGroupedBackground))
+    }
+
+    private func refreshPrices() {
+        isRefreshingPrices = true
+        Task {
+            await store.refreshPrices(in: group)
+            isRefreshingPrices = false
+        }
     }
 }

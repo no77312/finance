@@ -89,7 +89,7 @@ disk:
 
 截图导入会先在 iOS 本地做 OCR，然后把识别出的文字发给后端解析。后端支持两种模式：
 
-- 配置了 `OPENAI_API_KEY`：使用大模型结构化解析。
+- 配置了 `OPENAI_API_KEY`：使用你账号里的 OpenAI API 做大模型结构化解析。
 - 未配置 `OPENAI_API_KEY`：使用基础规则解析，仍可跑通，但需要更多人工确认。
 
 在 Render 服务的 `Environment` 里添加：
@@ -105,6 +105,18 @@ OPENAI_MODEL=gpt-4.1-mini
 ```
 
 改完环境变量后，点击 Render 的 `Manual Deploy` 或等待自动部署生效。
+
+## T-1 收盘价刷新
+
+提交或编辑持仓后，后端会尝试把 `lastPrice` 更新为最近一个交易日收盘价。iOS 的“我的持仓”里也有手动刷新按钮，可以刷新当前群组持仓表现。
+
+行情源配置：
+
+```text
+ALPHA_VANTAGE_API_KEY=你的 Alpha Vantage API Key
+```
+
+未配置 `ALPHA_VANTAGE_API_KEY` 时，后端会使用原型兜底行情源尝试刷新。现金类持仓不会刷新价格。
 
 ## 接入 iOS App
 

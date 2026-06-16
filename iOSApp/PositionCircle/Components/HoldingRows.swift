@@ -73,11 +73,20 @@ struct HoldingRow: View {
             if canSeeAmount {
                 HStack(spacing: 10) {
                     HoldingMetaItem(title: "数量", value: DisplayFormat.quantity(holding.quantity))
-                    HoldingMetaItem(title: "现价", value: DisplayFormat.money(holding.lastPrice, currency: holding.currency))
+                    HoldingMetaItem(
+                        title: holding.priceDate == nil ? "现价" : "收盘价",
+                        value: DisplayFormat.money(holding.lastPrice, currency: holding.currency)
+                    )
                     if canSeeCost {
                         HoldingMetaItem(title: "成本", value: DisplayFormat.money(holding.averageCost, currency: holding.currency))
                     }
                 }
+            }
+
+            if canSeeAmount, let priceDate = holding.priceDate {
+                Label("价格日期 \(priceDate)", systemImage: "calendar")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             if canSeeNote && !holding.note.isEmpty {

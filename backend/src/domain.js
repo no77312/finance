@@ -140,6 +140,9 @@ export function normalizeHoldingInput(body, groupID, ownerID, existingHolding = 
     currency,
     visibility,
     note: cleanString(body.note),
+    priceDate: cleanString(body.priceDate) || existingHolding?.priceDate || null,
+    priceSource: cleanString(body.priceSource) || existingHolding?.priceSource || "manual",
+    priceUpdatedAt: cleanString(body.priceUpdatedAt) || existingHolding?.priceUpdatedAt || null,
     updatedAt: new Date().toISOString()
   };
 }

@@ -11,6 +11,7 @@ import {
   summariesByCurrency
 } from "./domain.js";
 import { parseScreenshotImport } from "./importParser.js";
+import { enrichHoldingWithPreviousClose, refreshHoldingsWithPreviousClose } from "./marketData.js";
 
 export function createPositionCircleServer({ store }) {
   return createServer(async (request, response) => {
@@ -56,6 +57,7 @@ async function routeRequest(request, response, store) {
         "POST /api/groups",
         "GET /api/groups/:groupID",
         "POST /api/imports/parse-screenshot",
+        "POST /api/groups/:groupID/prices/refresh",
         "GET /api/groups/:groupID/holdings",
         "POST /api/groups/:groupID/holdings",
         "PUT /api/groups/:groupID/holdings/:holdingID",
@@ -111,6 +113,19 @@ async function routeRequest(request, response, store) {
     });
   }
 
+  if (parts[3] === "prices" && parts[4] === "refresh" && request.method === "POST" && parts.length === 5) {
+    const result = await store.update(async (data) => {
+      requireGroup(data, groupID);
+      const groupHoldings = data.holdings.filter((holding) => holding.groupID === groupID);
+      const refreshResult = await refreshHoldingsWithPreviousClose(groupHoldings);
+      const refreshedByID = new Map(refreshResult.holdings.map((holding) => [holding.id, holding]));
+      data.holdings = data.holdings.map((holding) => refreshedByID.get(holding.id) ?? holding);
+      return refreshResult;
+    });
+
+    return send(response, 200, result);
+  }
+
   if (parts[3] === "holdings" && request.method === "GET" && parts.length === 4) {
     const data = await store.read();
     requireGroup(data, groupID);
@@ -123,11 +138,12 @@ async function routeRequest(request, response, store) {
   if (parts[3] === "holdings" && request.method === "POST" && parts.length === 4) {
     const body = await readJsonBody(request);
     const memberID = memberIDForRequest(request, body);
-    const holding = await store.update((data) => {
+    const holding = await store.update(async (data) => {
       requireGroup(data, groupID);
       const nextHolding = normalizeHoldingInput(body, groupID, memberID);
-      data.holdings.push(nextHolding);
-      return nextHolding;
+      const pricedHolding = await enrichHoldingWithPreviousClose(nextHolding);
+      data.holdings.push(pricedHolding);
+      return pricedHolding;
     });
     return send(response, 201, { holding });
   }
@@ -136,7 +152,7 @@ async function routeRequest(request, response, store) {
     const holdingID = parts[4];
     const body = await readJsonBody(request);
     const memberID = memberIDForRequest(request, body);
-    const holding = await store.update((data) => {
+    const holding = await store.update(async (data) => {
       requireGroup(data, groupID);
       const index = data.holdings.findIndex((candidate) => candidate.id === holdingID && candidate.groupID === groupID);
       if (index === -1) {
@@ -146,8 +162,9 @@ async function routeRequest(request, response, store) {
         throw forbidden("HOLDING_OWNER_REQUIRED", "Only the owner can edit this holding.");
       }
       const nextHolding = normalizeHoldingInput(body, groupID, memberID, data.holdings[index]);
-      data.holdings[index] = nextHolding;
-      return nextHolding;
+      const pricedHolding = await enrichHoldingWithPreviousClose(nextHolding);
+      data.holdings[index] = pricedHolding;
+      return pricedHolding;
     });
     return send(response, 200, { holding });
   }

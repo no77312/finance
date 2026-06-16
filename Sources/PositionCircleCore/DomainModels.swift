@@ -123,6 +123,9 @@ public struct Holding: Identifiable, Codable, Hashable, Sendable {
     public var currency: HoldingCurrency
     public var visibility: PositionVisibility
     public var note: String
+    public var priceDate: String?
+    public var priceSource: String?
+    public var priceUpdatedAt: Date?
     public var updatedAt: Date
 
     public init(
@@ -138,6 +141,9 @@ public struct Holding: Identifiable, Codable, Hashable, Sendable {
         currency: HoldingCurrency,
         visibility: PositionVisibility = .full,
         note: String = "",
+        priceDate: String? = nil,
+        priceSource: String? = nil,
+        priceUpdatedAt: Date? = nil,
         updatedAt: Date = Date()
     ) {
         self.id = id
@@ -152,6 +158,9 @@ public struct Holding: Identifiable, Codable, Hashable, Sendable {
         self.currency = currency
         self.visibility = visibility
         self.note = note
+        self.priceDate = priceDate
+        self.priceSource = priceSource
+        self.priceUpdatedAt = priceUpdatedAt
         self.updatedAt = updatedAt
     }
 }

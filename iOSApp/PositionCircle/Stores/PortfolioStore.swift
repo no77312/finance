@@ -97,6 +97,28 @@ final class PortfolioStore: ObservableObject {
         }
     }
 
+    func refreshPrices(in group: InvestmentGroup) async {
+        isSyncing = true
+        defer { isSyncing = false }
+
+        do {
+            let response = try await apiClient.refreshPrices(in: group)
+            for remoteHolding in response.holdings {
+                if let index = holdings.firstIndex(where: { $0.id == remoteHolding.id }) {
+                    holdings[index] = remoteHolding
+                }
+            }
+
+            if response.failed.isEmpty {
+                backendStatus = "已刷新 \(response.updatedCount) 个收盘价"
+            } else {
+                backendStatus = "已刷新 \(response.updatedCount) 个，\(response.failed.count) 个未更新"
+            }
+        } catch {
+            backendStatus = "收盘价刷新失败"
+        }
+    }
+
     func createGroup(name: String, subtitle: String) {
         let group = InvestmentGroup(
             name: name,

@@ -8,6 +8,7 @@
 - Node 后端：本地 API、文件持久化、群组/持仓 CRUD、聚合分析接口。
 - iOS 网络层：启动拉取后端数据，保存/删除同步后端，后端不可用时回退到演示数据。
 - 截图导入：iOS 本地 OCR 识别截图文字，后端可用 OpenAI 大模型解析成持仓草稿，确认后写入。
+- 表现追踪：提交/编辑持仓时后端会尝试更新最近一个交易日收盘价，也可在“我的持仓”手动刷新。
 - 核心业务模块：成员、群组、持仓、可见性、币种、按标的聚合、按币种汇总。
 - 隐私基础能力：支持完整可见、隐藏成本、仅标的三种可见性。
 - Xcode 工程：`iOSApp/PositionCircle.xcodeproj`。
@@ -58,6 +59,16 @@ https://position-circle-api.onrender.com
 OPENAI_API_KEY=你的 OpenAI API Key
 OPENAI_MODEL=gpt-4.1-mini
 ```
+
+## 收盘价刷新配置
+
+后端会优先使用 Alpha Vantage 官方日线接口；未配置 Key 时，会用原型兜底行情源尝试刷新。
+
+```text
+ALPHA_VANTAGE_API_KEY=你的 Alpha Vantage API Key
+```
+
+支持的原型市场：美股、港股、A 股、基金/ETF、主流加密资产。现金类持仓不会刷新价格。
 
 ## Render 部署
 

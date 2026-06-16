@@ -74,6 +74,14 @@ struct PositionCircleAPIClient {
         )
     }
 
+    func refreshPrices(in group: InvestmentGroup) async throws -> PriceRefreshResponse {
+        try await request(
+            path: "/api/groups/\(group.id.uuidString)/prices/refresh",
+            method: "POST",
+            body: EmptyRequest()
+        )
+    }
+
     func parseScreenshotImport(
         ocrText: String,
         defaultVisibility: PositionVisibility
@@ -163,6 +171,18 @@ private struct GroupResponse: Decodable {
 
 private struct HoldingResponse: Decodable {
     var holding: Holding
+}
+
+struct PriceRefreshResponse: Decodable {
+    var holdings: [Holding]
+    var updatedCount: Int
+    var failed: [PriceRefreshFailure]
+}
+
+struct PriceRefreshFailure: Decodable {
+    var symbol: String
+    var market: AssetMarket
+    var message: String
 }
 
 private struct ServerErrorResponse: Decodable {

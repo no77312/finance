@@ -19,6 +19,8 @@ main().catch((error) => {
 });
 
 async function main() {
+  process.env.PRICE_REFRESH_DISABLED = "1";
+
   const tempDir = await mkdtemp(join(tmpdir(), "position-circle-api-"));
   const store = new FileStore({
     dataFile: join(tempDir, "store.json"),
@@ -33,6 +35,7 @@ async function main() {
     await servesHealthAndBootstrapData();
     await parsesScreenshotImportDraftsWithoutModelKey();
     await createsHoldingAndIncludesItInAnalytics();
+    await refreshesPricesWithoutBreakingWhenProviderDisabled();
     await updatesAndDeletesOwnedHolding();
     console.log("PositionCircle API checks passed");
   } finally {
@@ -75,6 +78,14 @@ async function parsesScreenshotImportDraftsWithoutModelKey() {
       process.env.OPENAI_API_KEY = previousKey;
     }
   }
+}
+
+async function refreshesPricesWithoutBreakingWhenProviderDisabled() {
+  const refreshed = await postJson(`/api/groups/${groupID}/prices/refresh`, {});
+
+  assert.equal(refreshed.updatedCount, 0);
+  assert.equal(refreshed.holdings.length >= 5, true);
+  assert.ok(refreshed.failed.some((item) => item.symbol === "AAPL" || item.symbol === "0700"));
 }
 
 async function createsHoldingAndIncludesItInAnalytics() {
