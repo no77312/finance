@@ -7,18 +7,18 @@
 当前配置：
 
 ```text
-Web Service: free
+Web Service: starter
 Region: singapore
-Persistent Disk: none
+Persistent Disk: 1GB
 ```
 
-按 Render 当前公开价格，Web Service Free 适合原型试跑：
+按 Render 当前公开价格，大约是：
 
 ```text
-$0/月
+$7/月 + $0.25/月 = $7.25/月
 ```
 
-免费模式没有持久化磁盘。服务重启、休眠恢复或重新部署后，运行时写入的 `backend/data/store.json` 可能丢失，并回到 `backend/data/seed.json` 的演示数据。
+这套配置会把后端运行时数据写到 Render Persistent Disk。服务重启和重新部署后，用户提交的持仓会保留。
 
 ## 部署步骤
 
@@ -68,13 +68,7 @@ https://position-circle-api.onrender.com/api/bootstrap
 
 ## 数据持久化
 
-当前免费配置没有 Persistent Disk：
-
-```yaml
-plan: free
-```
-
-这适合验证接口、iOS 联调和 Demo。等你确认要长期使用时，再把 `render.yaml` 改回付费持久化配置：
+`render.yaml` 配置了：
 
 ```yaml
 plan: starter
@@ -88,6 +82,8 @@ disk:
   mountPath: /var/data
   sizeGB: 1
 ```
+
+只有 `/var/data` 下面的文件会被持久化。后端通过 `DATA_FILE=/var/data/store.json` 把持仓数据写入这个磁盘。
 
 ## 接入 iOS App
 
