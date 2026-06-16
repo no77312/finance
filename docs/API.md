@@ -131,6 +131,32 @@ PWA Google 登录。前端通过 Google Identity Services 拿到 ID token 后，
 }
 ```
 
+### PUT /api/groups/:groupID/holdings/sync
+
+按“完整快照”同步当前用户在该群组下的持仓。这个接口适合截图导入：
+
+- 本次快照里已有且历史已存在的标的：更新。
+- 本次快照里新出现的标的：创建。
+- 历史里存在但本次快照里消失的标的：删除。
+
+```json
+{
+  "holdings": [
+    {
+      "symbol": "AAPL",
+      "assetName": "Apple",
+      "market": "usStock",
+      "quantity": 6,
+      "averageCost": 180,
+      "lastPrice": 210,
+      "currency": "USD",
+      "visibility": "amountOnly",
+      "note": "截图同步"
+    }
+  ]
+}
+```
+
 ### PUT /api/groups/:groupID/holdings/:holdingID
 
 更新自己的持仓。

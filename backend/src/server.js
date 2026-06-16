@@ -92,6 +92,7 @@ async function routeRequest(request, response, store, context) {
         "GET /api/groups/:groupID/holding-events",
         "GET /api/groups/:groupID/holdings",
         "POST /api/groups/:groupID/holdings",
+        "PUT /api/groups/:groupID/holdings/sync",
         "PUT /api/groups/:groupID/holdings/:holdingID",
         "DELETE /api/groups/:groupID/holdings/:holdingID",
         "GET /api/groups/:groupID/analytics"
@@ -290,6 +291,84 @@ async function routeRequest(request, response, store, context) {
       };
     });
     return send(response, 201, result);
+  }
+
+  if (parts[3] === "holdings" && request.method === "PUT" && parts.length === 5 && parts[4] === "sync") {
+    const body = await readJsonBody(request);
+    const memberID = requireMemberID(request, body);
+    const result = await store.update((data) => {
+      requireSessionForUser(data, memberID, request);
+      requireGroupAccess(data, groupID, memberID);
+
+      const snapshotHoldings = normalizeSnapshotHoldings(body.holdings, groupID, memberID);
+      const existingHoldings = data.holdings.filter((candidate) => candidate.groupID === groupID && candidate.ownerID === memberID);
+      const existingBySymbol = new Map();
+      const duplicateExisting = [];
+
+      for (const holding of existingHoldings) {
+        if (existingBySymbol.has(holding.symbol)) {
+          duplicateExisting.push(holding);
+          continue;
+        }
+        existingBySymbol.set(holding.symbol, holding);
+      }
+
+      const incomingSymbols = new Set(snapshotHoldings.map((holding) => holding.symbol));
+      const created = [];
+      const updated = [];
+      const deleted = [];
+      const events = [];
+
+      for (const draft of snapshotHoldings) {
+        const previousHolding = existingBySymbol.get(draft.symbol);
+        if (previousHolding) {
+          const nextHolding = normalizeHoldingInput(draft, groupID, memberID, previousHolding);
+          replaceHolding(data, nextHolding);
+          updated.push(nextHolding);
+          events.push(createHoldingEvent("updated", nextHolding, previousHolding));
+          continue;
+        }
+
+        const nextHolding = normalizeHoldingInput(draft, groupID, memberID);
+        data.holdings.push(nextHolding);
+        created.push(nextHolding);
+        events.push(createHoldingEvent("created", nextHolding));
+      }
+
+      for (const holding of existingHoldings) {
+        if (!incomingSymbols.has(holding.symbol)) {
+          data.holdings = data.holdings.filter((candidate) => candidate.id !== holding.id);
+          deleted.push(holding);
+          events.push(createHoldingEvent("deleted", holding));
+        }
+      }
+
+      for (const holding of duplicateExisting) {
+        if (data.holdings.some((candidate) => candidate.id === holding.id)) {
+          data.holdings = data.holdings.filter((candidate) => candidate.id !== holding.id);
+          deleted.push(holding);
+          events.push(createHoldingEvent("deleted", holding));
+        }
+      }
+
+      for (const event of events) {
+        appendHoldingEvent(data, event);
+      }
+
+      return {
+        created,
+        updated,
+        deleted,
+        events,
+        summary: {
+          createdCount: created.length,
+          updatedCount: updated.length,
+          deletedCount: deleted.length,
+          snapshotCount: snapshotHoldings.length
+        }
+      };
+    });
+    return send(response, 200, result);
   }
 
   if (parts[3] === "holdings" && request.method === "PUT" && parts.length === 5) {
@@ -512,6 +591,35 @@ function appendHoldingEvent(data, event) {
   data.holdingEvents ??= [];
   data.holdingEvents.push(event);
   data.holdingEvents = data.holdingEvents.slice(-500);
+}
+
+function normalizeSnapshotHoldings(holdings, groupID, memberID) {
+  if (!Array.isArray(holdings)) {
+    throw badRequest("HOLDINGS_REQUIRED", "Snapshot holdings must be an array.");
+  }
+
+  const normalized = holdings.map((holding) => normalizeHoldingInput({
+    ...holding,
+    note: cleanString(holding.note) || "截图同步"
+  }, groupID, memberID));
+
+  const seenSymbols = new Set();
+  for (const holding of normalized) {
+    if (seenSymbols.has(holding.symbol)) {
+      throw badRequest("DUPLICATE_SYMBOL", `Snapshot contains duplicate symbol: ${holding.symbol}.`);
+    }
+    seenSymbols.add(holding.symbol);
+  }
+
+  return normalized;
+}
+
+function replaceHolding(data, nextHolding) {
+  const index = data.holdings.findIndex((candidate) => candidate.id === nextHolding.id);
+  if (index === -1) {
+    throw notFound("HOLDING_NOT_FOUND", "Holding not found.");
+  }
+  data.holdings[index] = nextHolding;
 }
 
 async function serveStaticAsset(pathname, response, publicDir) {

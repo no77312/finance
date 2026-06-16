@@ -486,12 +486,12 @@ function draftsHTML() {
 
   return `
     <section class="section">
-      <div class="section-header">
-        <h3 class="section-title">解析结果</h3>
-        <button class="secondary-button" type="button" data-action="import-drafts" ${state.busy ? "disabled" : ""}>全部导入</button>
-      </div>
-      <div class="draft-list">
-        ${state.drafts.map((draft) => holdingDraftHTML(draft)).join("")}
+        <div class="section-header">
+          <h3 class="section-title">解析结果</h3>
+          <button class="secondary-button" type="button" data-action="import-drafts" ${state.busy ? "disabled" : ""}>同步本次持仓</button>
+        </div>
+        <div class="draft-list">
+          ${state.drafts.map((draft) => holdingDraftHTML(draft)).join("")}
       </div>
     </section>
   `;
@@ -754,10 +754,10 @@ async function importDrafts() {
   }
 
   await runBusy(async () => {
-    for (const draft of importable) {
-      await api(`/api/groups/${encodeURIComponent(group.id)}/holdings`, {
-        method: "POST",
-        body: {
+    const result = await api(`/api/groups/${encodeURIComponent(group.id)}/holdings/sync`, {
+      method: "PUT",
+      body: {
+        holdings: importable.map((draft) => ({
           symbol: draft.symbol,
           assetName: draft.assetName || draft.symbol,
           market: draft.market || "usStock",
@@ -766,14 +766,14 @@ async function importDrafts() {
           lastPrice: draft.lastPrice,
           currency: draft.currency || "USD",
           visibility: draft.visibility || "amountOnly",
-          note: draft.note || "截图导入"
-        }
-      });
-    }
+          note: draft.note || "截图同步"
+        }))
+      }
+    });
     await refreshBootstrap();
     state.sheet = "";
     state.drafts = [];
-    state.message = `已导入 ${importable.length} 条持仓。`;
+    state.message = `已同步 ${result.summary.snapshotCount} 条持仓，新增 ${result.summary.createdCount}，更新 ${result.summary.updatedCount}，删除 ${result.summary.deletedCount}。`;
   });
 }
 

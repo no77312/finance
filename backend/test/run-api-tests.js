@@ -51,6 +51,7 @@ async function main() {
     await signsInAndJoinsGroupByInviteCode();
     await signsInWithGoogleAndCreatesGroup();
     await createsGroupForSignedInUser();
+    await syncsSnapshotHoldingsForCurrentMember();
     await createsHoldingAndIncludesItInAnalytics();
     await rejectsPriceRefreshWithoutToken();
     await refreshesPricesWithoutBreakingWhenProviderDisabled();
@@ -268,6 +269,51 @@ async function createsHoldingAndIncludesItInAnalytics() {
 
   const analytics = await getJson(`/api/groups/${groupID}/analytics`);
   assert.ok(analytics.exposures.some((exposure) => exposure.symbol === "AAPL"));
+}
+
+async function syncsSnapshotHoldingsForCurrentMember() {
+  const synced = await putJson(`/api/groups/${groupID}/holdings/sync`, {
+    holdings: [
+      {
+        symbol: "MSFT",
+        assetName: "Microsoft",
+        market: "usStock",
+        quantity: 10,
+        averageCost: 390,
+        lastPrice: 450,
+        currency: "USD",
+        visibility: "full",
+        note: "截图同步"
+      },
+      {
+        symbol: "AAPL",
+        assetName: "Apple",
+        market: "usStock",
+        quantity: 6,
+        averageCost: 180,
+        lastPrice: 210,
+        currency: "USD",
+        visibility: "amountOnly",
+        note: "截图同步"
+      }
+    ]
+  });
+
+  assert.equal(synced.summary.createdCount, 1);
+  assert.equal(synced.summary.updatedCount, 1);
+  assert.equal(synced.summary.deletedCount, 1);
+  assert.equal(synced.summary.snapshotCount, 2);
+
+  const holdings = await getJson(`/api/groups/${groupID}/holdings`);
+  const mine = holdings.holdings.filter((holding) => holding.ownerID === memberID);
+  assert.deepEqual(mine.map((holding) => holding.symbol).sort(), ["AAPL", "MSFT"]);
+  assert.equal(mine.find((holding) => holding.symbol === "MSFT").quantity, 10);
+  assert.equal(mine.find((holding) => holding.symbol === "AAPL").visibility, "amountOnly");
+
+  const events = await getJson(`/api/groups/${groupID}/holding-events`);
+  assert.ok(events.events.some((event) => event.type === "updated" && event.symbol === "MSFT"));
+  assert.ok(events.events.some((event) => event.type === "created" && event.symbol === "AAPL"));
+  assert.ok(events.events.some((event) => event.type === "deleted" && event.symbol === "VOO"));
 }
 
 async function updatesAndDeletesOwnedHolding() {
