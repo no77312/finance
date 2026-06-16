@@ -75,6 +75,10 @@ async function fetchAlphaVantageDailyClose(holding) {
     return null;
   }
 
+  if (holding.market === "crypto") {
+    return fetchAlphaVantageCryptoDailyClose(holding, apikey);
+  }
+
   const symbol = alphaVantageSymbol(holding);
   if (!symbol) {
     return null;
@@ -103,6 +107,42 @@ async function fetchAlphaVantageDailyClose(holding) {
       close,
       date: latestDate,
       source: `alpha_vantage:${symbol}`
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchAlphaVantageCryptoDailyClose(holding, apikey) {
+  const symbol = cleanSymbol(holding.symbol);
+  const market = cleanSymbol(holding.currency || "USD");
+  if (!symbol || !market) {
+    return null;
+  }
+
+  const url = new URL(ALPHA_VANTAGE_URL);
+  url.searchParams.set("function", "DIGITAL_CURRENCY_DAILY");
+  url.searchParams.set("symbol", symbol);
+  url.searchParams.set("market", market);
+  url.searchParams.set("apikey", apikey);
+
+  try {
+    const data = await fetchJson(url);
+    const timeSeries = data["Time Series (Digital Currency Daily)"] ?? firstTimeSeries(data);
+    if (!timeSeries || typeof timeSeries !== "object") {
+      return null;
+    }
+
+    const latestDate = Object.keys(timeSeries).sort().reverse()[0];
+    const close = closeValue(timeSeries[latestDate], market);
+    if (!latestDate || !Number.isFinite(close) || close <= 0) {
+      return null;
+    }
+
+    return {
+      close,
+      date: latestDate,
+      source: `alpha_vantage:${symbol}-${market}`
     };
   } catch {
     return null;
@@ -216,6 +256,40 @@ function cleanSymbol(value) {
     .trim()
     .replace(/^(HK|US|SH|SZ)\./i, "")
     .toUpperCase();
+}
+
+function firstTimeSeries(data) {
+  return Object.entries(data).find(([key, value]) => {
+    return key.toLowerCase().includes("time series") && value && typeof value === "object";
+  })?.[1];
+}
+
+function closeValue(entry, currency) {
+  if (!entry || typeof entry !== "object") {
+    return Number.NaN;
+  }
+
+  const candidates = [
+    "4. close",
+    `4a. close (${currency})`,
+    `4b. close (${currency})`,
+    `4a. close (${currency.toLowerCase()})`,
+    `4b. close (${currency.toLowerCase()})`,
+    "4b. close (USD)",
+    "4a. close (USD)"
+  ];
+
+  for (const key of candidates) {
+    const value = Number(entry[key]);
+    if (Number.isFinite(value) && value > 0) {
+      return value;
+    }
+  }
+
+  const closeEntry = Object.entries(entry).find(([key, value]) => {
+    return key.toLowerCase().includes("close") && Number.isFinite(Number(value)) && Number(value) > 0;
+  });
+  return Number(closeEntry?.[1]);
 }
 
 function isoDateFromUnixSeconds(value) {

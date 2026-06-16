@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import {
   badRequest,
+  createHoldingEvent,
   exposures,
   findCurrentMember,
   forbidden,
@@ -11,7 +12,7 @@ import {
   summariesByCurrency
 } from "./domain.js";
 import { parseScreenshotImport } from "./importParser.js";
-import { enrichHoldingWithPreviousClose, refreshHoldingsWithPreviousClose } from "./marketData.js";
+import { refreshHoldingsWithPreviousClose } from "./marketData.js";
 
 export function createPositionCircleServer({ store }) {
   return createServer(async (request, response) => {
@@ -57,7 +58,9 @@ async function routeRequest(request, response, store) {
         "POST /api/groups",
         "GET /api/groups/:groupID",
         "POST /api/imports/parse-screenshot",
+        "POST /api/admin/prices/refresh",
         "POST /api/groups/:groupID/prices/refresh",
+        "GET /api/groups/:groupID/holding-events",
         "GET /api/groups/:groupID/holdings",
         "POST /api/groups/:groupID/holdings",
         "PUT /api/groups/:groupID/holdings/:holdingID",
@@ -70,6 +73,22 @@ async function routeRequest(request, response, store) {
   if (parts[1] === "imports" && request.method === "POST" && parts.length === 3 && parts[2] === "parse-screenshot") {
     const body = await readJsonBody(request);
     const result = await parseScreenshotImport(body);
+    return send(response, 200, result);
+  }
+
+  if (parts[1] === "admin" && request.method === "POST" && parts.length === 4 && parts[2] === "prices" && parts[3] === "refresh") {
+    requirePriceRefreshToken(request);
+
+    const result = await store.update(async (data) => {
+      const refreshResult = await refreshHoldingsWithPreviousClose(data.holdings);
+      const refreshedByID = new Map(refreshResult.holdings.map((holding) => [holding.id, holding]));
+      data.holdings = data.holdings.map((holding) => refreshedByID.get(holding.id) ?? holding);
+      return {
+        ...refreshResult,
+        refreshedAt: new Date().toISOString()
+      };
+    });
+
     return send(response, 200, result);
   }
 
@@ -114,6 +133,8 @@ async function routeRequest(request, response, store) {
   }
 
   if (parts[3] === "prices" && parts[4] === "refresh" && request.method === "POST" && parts.length === 5) {
+    requirePriceRefreshToken(request);
+
     const result = await store.update(async (data) => {
       requireGroup(data, groupID);
       const groupHoldings = data.holdings.filter((holding) => holding.groupID === groupID);
@@ -124,6 +145,16 @@ async function routeRequest(request, response, store) {
     });
 
     return send(response, 200, result);
+  }
+
+  if (parts[3] === "holding-events" && request.method === "GET" && parts.length === 4) {
+    const data = await store.read();
+    requireGroup(data, groupID);
+    const memberID = memberIDForRequest(request);
+    const events = data.holdingEvents
+      .filter((event) => event.groupID === groupID && (!memberID || event.ownerID === memberID))
+      .sort((first, second) => new Date(second.createdAt) - new Date(first.createdAt));
+    return send(response, 200, { events });
   }
 
   if (parts[3] === "holdings" && request.method === "GET" && parts.length === 4) {
@@ -138,21 +169,25 @@ async function routeRequest(request, response, store) {
   if (parts[3] === "holdings" && request.method === "POST" && parts.length === 4) {
     const body = await readJsonBody(request);
     const memberID = memberIDForRequest(request, body);
-    const holding = await store.update(async (data) => {
+    const result = await store.update((data) => {
       requireGroup(data, groupID);
       const nextHolding = normalizeHoldingInput(body, groupID, memberID);
-      const pricedHolding = await enrichHoldingWithPreviousClose(nextHolding);
-      data.holdings.push(pricedHolding);
-      return pricedHolding;
+      data.holdings.push(nextHolding);
+      const event = createHoldingEvent("created", nextHolding);
+      appendHoldingEvent(data, event);
+      return {
+        holding: nextHolding,
+        event
+      };
     });
-    return send(response, 201, { holding });
+    return send(response, 201, result);
   }
 
   if (parts[3] === "holdings" && request.method === "PUT" && parts.length === 5) {
     const holdingID = parts[4];
     const body = await readJsonBody(request);
     const memberID = memberIDForRequest(request, body);
-    const holding = await store.update(async (data) => {
+    const result = await store.update((data) => {
       requireGroup(data, groupID);
       const index = data.holdings.findIndex((candidate) => candidate.id === holdingID && candidate.groupID === groupID);
       if (index === -1) {
@@ -161,18 +196,23 @@ async function routeRequest(request, response, store) {
       if (data.holdings[index].ownerID !== memberID) {
         throw forbidden("HOLDING_OWNER_REQUIRED", "Only the owner can edit this holding.");
       }
-      const nextHolding = normalizeHoldingInput(body, groupID, memberID, data.holdings[index]);
-      const pricedHolding = await enrichHoldingWithPreviousClose(nextHolding);
-      data.holdings[index] = pricedHolding;
-      return pricedHolding;
+      const previousHolding = data.holdings[index];
+      const nextHolding = normalizeHoldingInput(body, groupID, memberID, previousHolding);
+      data.holdings[index] = nextHolding;
+      const event = createHoldingEvent("updated", nextHolding, previousHolding);
+      appendHoldingEvent(data, event);
+      return {
+        holding: nextHolding,
+        event
+      };
     });
-    return send(response, 200, { holding });
+    return send(response, 200, result);
   }
 
   if (parts[3] === "holdings" && request.method === "DELETE" && parts.length === 5) {
     const holdingID = parts[4];
     const memberID = memberIDForRequest(request);
-    await store.update((data) => {
+    const event = await store.update((data) => {
       requireGroup(data, groupID);
       const holding = data.holdings.find((candidate) => candidate.id === holdingID && candidate.groupID === groupID);
       if (!holding) {
@@ -181,9 +221,12 @@ async function routeRequest(request, response, store) {
       if (holding.ownerID !== memberID) {
         throw forbidden("HOLDING_OWNER_REQUIRED", "Only the owner can delete this holding.");
       }
+      const event = createHoldingEvent("deleted", holding);
       data.holdings = data.holdings.filter((candidate) => candidate.id !== holdingID);
+      appendHoldingEvent(data, event);
+      return event;
     });
-    return send(response, 204, undefined);
+    return send(response, 200, { event });
   }
 
   throw notFound("ROUTE_NOT_FOUND", "Route not found.");
@@ -199,6 +242,32 @@ function requireGroup(data, groupID) {
 
 function memberIDForRequest(request, body = {}) {
   return request.headers["x-member-id"] ?? body.ownerID ?? body.memberID ?? body.currentMemberID;
+}
+
+function requirePriceRefreshToken(request) {
+  const expectedToken = process.env.PRICE_REFRESH_TOKEN;
+  if (!expectedToken) {
+    throw forbidden("PRICE_REFRESH_NOT_CONFIGURED", "Set PRICE_REFRESH_TOKEN to enable scheduled price refresh.");
+  }
+
+  const providedToken = bearerToken(request.headers.authorization) ?? request.headers["x-refresh-token"];
+  if (providedToken !== expectedToken) {
+    throw forbidden("PRICE_REFRESH_FORBIDDEN", "Invalid price refresh token.");
+  }
+}
+
+function bearerToken(value) {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const [scheme, token] = value.split(" ");
+  return scheme?.toLowerCase() === "bearer" && token ? token : undefined;
+}
+
+function appendHoldingEvent(data, event) {
+  data.holdingEvents ??= [];
+  data.holdingEvents.push(event);
+  data.holdingEvents = data.holdingEvents.slice(-500);
 }
 
 async function readJsonBody(request) {
@@ -225,7 +294,7 @@ function send(response, statusCode, body) {
   response.statusCode = statusCode;
   response.setHeader("Access-Control-Allow-Origin", "*");
   response.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-  response.setHeader("Access-Control-Allow-Headers", "Content-Type,X-Member-ID");
+  response.setHeader("Access-Control-Allow-Headers", "Authorization,Content-Type,X-Member-ID,X-Refresh-Token");
 
   if (body === undefined) {
     response.end();

@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 export const assetMarkets = new Set(["usStock", "hkStock", "cnStock", "fund", "crypto", "cash"]);
 export const holdingCurrencies = new Set(["USD", "HKD", "CNY", "SGD"]);
 export const positionVisibilities = new Set(["full", "amountOnly", "symbolOnly"]);
+export const holdingEventTypes = new Set(["created", "updated", "deleted"]);
 
 export function summarize(holdings) {
   const holders = new Set(holdings.map((holding) => holding.ownerID));
@@ -157,6 +158,41 @@ export function normalizeHoldingInput(body, groupID, ownerID, existingHolding = 
     priceUpdatedAt,
     updatedAt: new Date().toISOString()
   };
+}
+
+export function createHoldingEvent(type, holding, previousHolding = undefined) {
+  if (!holdingEventTypes.has(type)) {
+    throw badRequest("INVALID_EVENT_TYPE", `Event type must be one of: ${Array.from(holdingEventTypes).join(", ")}.`);
+  }
+
+  const event = {
+    id: randomUUID().toUpperCase(),
+    groupID: holding.groupID,
+    holdingID: holding.id,
+    ownerID: holding.ownerID,
+    type,
+    symbol: holding.symbol,
+    assetName: holding.assetName,
+    market: holding.market,
+    quantity: holding.quantity,
+    averageCost: holding.averageCost,
+    lastPrice: holding.lastPrice,
+    currency: holding.currency,
+    visibility: holding.visibility,
+    note: holding.note ?? "",
+    createdAt: new Date().toISOString()
+  };
+
+  if (previousHolding) {
+    event.previousSymbol = previousHolding.symbol;
+    event.previousAssetName = previousHolding.assetName;
+    event.previousQuantity = previousHolding.quantity;
+    event.previousAverageCost = previousHolding.averageCost;
+    event.previousLastPrice = previousHolding.lastPrice;
+    event.previousVisibility = previousHolding.visibility;
+  }
+
+  return event;
 }
 
 export function findCurrentMember(data, memberID) {

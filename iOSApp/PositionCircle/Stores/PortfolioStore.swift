@@ -5,6 +5,7 @@ import SwiftUI
 final class PortfolioStore: ObservableObject {
     @Published var groups: [InvestmentGroup]
     @Published var holdings: [Holding]
+    @Published var holdingEvents: [HoldingEvent]
     @Published var selectedGroupID: UUID?
     @Published var backendStatus: String = "本地演示数据"
     @Published var isSyncing: Bool = false
@@ -15,11 +16,13 @@ final class PortfolioStore: ObservableObject {
     init(
         groups: [InvestmentGroup] = DemoData.groups,
         holdings: [Holding] = DemoData.holdings,
+        holdingEvents: [HoldingEvent] = DemoData.holdingEvents,
         currentMemberID: UUID = DemoData.currentMemberID,
         apiClient: PositionCircleAPIClient = PositionCircleAPIClient()
     ) {
         self.groups = groups
         self.holdings = holdings
+        self.holdingEvents = holdingEvents
         self.currentMemberID = currentMemberID
         self.apiClient = apiClient
         self.selectedGroupID = groups.first?.id
@@ -47,6 +50,12 @@ final class PortfolioStore: ObservableObject {
             for: currentMemberID,
             in: holdings(for: group)
         )
+    }
+
+    func currentMemberEvents(in group: InvestmentGroup) -> [HoldingEvent] {
+        holdingEvents
+            .filter { $0.groupID == group.id && $0.ownerID == currentMemberID }
+            .sorted { $0.createdAt > $1.createdAt }
     }
 
     func ownerName(for holding: Holding, in group: InvestmentGroup) -> String {
@@ -97,28 +106,6 @@ final class PortfolioStore: ObservableObject {
         }
     }
 
-    func refreshPrices(in group: InvestmentGroup) async {
-        isSyncing = true
-        defer { isSyncing = false }
-
-        do {
-            let response = try await apiClient.refreshPrices(in: group)
-            for remoteHolding in response.holdings {
-                if let index = holdings.firstIndex(where: { $0.id == remoteHolding.id }) {
-                    holdings[index] = remoteHolding
-                }
-            }
-
-            if response.failed.isEmpty {
-                backendStatus = "已刷新 \(response.updatedCount) 个收盘价"
-            } else {
-                backendStatus = "已刷新 \(response.updatedCount) 个，\(response.failed.count) 个未更新"
-            }
-        } catch {
-            backendStatus = "收盘价刷新失败"
-        }
-    }
-
     func createGroup(name: String, subtitle: String) {
         let group = InvestmentGroup(
             name: name,
@@ -143,6 +130,7 @@ final class PortfolioStore: ObservableObject {
             let response = try await apiClient.bootstrap()
             groups = response.groups
             holdings = response.holdings
+            holdingEvents = response.holdingEvents ?? []
             selectedGroupID = response.groups.first?.id
             backendStatus = "已连接后端"
         } catch {
@@ -161,14 +149,18 @@ final class PortfolioStore: ObservableObject {
         defer { isSyncing = false }
 
         do {
-            let remoteHolding: Holding
+            let response: HoldingMutationResponse
             if isExisting {
-                remoteHolding = try await apiClient.updateHolding(holding)
+                response = try await apiClient.updateHolding(holding)
             } else {
-                remoteHolding = try await apiClient.createHolding(holding)
+                response = try await apiClient.createHolding(holding)
             }
+            let remoteHolding = response.holding
             if let index = holdings.firstIndex(where: { $0.id == remoteHolding.id }) {
                 holdings[index] = remoteHolding
+            }
+            if let event = response.event {
+                record(event)
             }
             backendStatus = "已同步后端"
         } catch {
@@ -181,7 +173,9 @@ final class PortfolioStore: ObservableObject {
         defer { isSyncing = false }
 
         do {
-            try await apiClient.deleteHolding(holding)
+            if let event = try await apiClient.deleteHolding(holding) {
+                record(event)
+            }
             backendStatus = "已同步后端"
         } catch {
             backendStatus = "删除同步失败"
@@ -201,6 +195,15 @@ final class PortfolioStore: ObservableObject {
             backendStatus = "已同步后端"
         } catch {
             backendStatus = "新建群组同步失败"
+        }
+    }
+
+    private func record(_ event: HoldingEvent) {
+        holdingEvents.removeAll { $0.id == event.id }
+        holdingEvents.append(event)
+        holdingEvents.sort { $0.createdAt > $1.createdAt }
+        if holdingEvents.count > 500 {
+            holdingEvents = Array(holdingEvents.prefix(500))
         }
     }
 }

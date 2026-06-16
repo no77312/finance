@@ -38,6 +38,13 @@ enum DisplayFormat {
         return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
     }
 
+    static func shortDateTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "M月d日 HH:mm"
+        return formatter.string(from: date)
+    }
+
     private static func compactNumber(_ value: Double) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal

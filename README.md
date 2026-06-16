@@ -8,7 +8,8 @@
 - Node 后端：本地 API、文件持久化、群组/持仓 CRUD、聚合分析接口。
 - iOS 网络层：启动拉取后端数据，保存/删除同步后端，后端不可用时回退到演示数据。
 - 截图导入：iOS 本地 OCR 识别截图文字，后端可用 OpenAI 大模型解析成持仓草稿，确认后写入。
-- 表现追踪：提交/编辑持仓时后端会尝试更新最近一个交易日收盘价，也可在“我的持仓”手动刷新。
+- 表现追踪：后端提供受保护的收盘价刷新接口，GitHub Actions 可每天收盘后自动调用。
+- 变动记录：“我的持仓”展示最近提交、编辑、删除持仓的时间轴。
 - 核心业务模块：成员、群组、持仓、可见性、币种、按标的聚合、按币种汇总。
 - 隐私基础能力：支持完整可见、隐藏成本、仅标的三种可见性。
 - Xcode 工程：`iOSApp/PositionCircle.xcodeproj`。
@@ -66,9 +67,10 @@ OPENAI_MODEL=gpt-4.1-mini
 
 ```text
 ALPHA_VANTAGE_API_KEY=你的 Alpha Vantage API Key
+PRICE_REFRESH_TOKEN=一段随机生成的刷新密钥
 ```
 
-支持的原型市场：美股、A 股、基金/ETF。现金类持仓不会刷新价格。
+支持的原型市场：美股、A 股、基金/ETF、加密货币。现金类持仓不会刷新价格。定时刷新由 `.github/workflows/refresh-prices.yml` 调用后端 `/api/admin/prices/refresh`，需要在 GitHub Actions Secrets 里配置同一个 `PRICE_REFRESH_TOKEN`。
 
 ## Render 部署
 

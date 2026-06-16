@@ -109,5 +109,47 @@
       "note": "小比例配置",
       "updatedAt": "2025-06-16T15:06:40.000Z"
     }
+  ],
+  "holdingEvents": [
+    {
+      "id": "25F61E2B-48E8-4E89-8E33-9823A8D40001",
+      "groupID": "D54C3FB6-11E8-447D-A2BB-EF9505087101",
+      "holdingID": "1C687970-A0EE-442D-A6F5-E5714B411002",
+      "ownerID": "4D99EF67-4E8F-4BA6-9E96-1E62E7680010",
+      "type": "updated",
+      "symbol": "MSFT",
+      "assetName": "Microsoft",
+      "market": "usStock",
+      "quantity": 8,
+      "averageCost": 392,
+      "lastPrice": 445,
+      "currency": "USD",
+      "visibility": "amountOnly",
+      "note": "AI 与云业务继续观察",
+      "previousSymbol": "MSFT",
+      "previousAssetName": "Microsoft",
+      "previousQuantity": 6,
+      "previousAverageCost": 388,
+      "previousLastPrice": 430,
+      "previousVisibility": "amountOnly",
+      "createdAt": "2025-06-15T23:26:40.000Z"
+    },
+    {
+      "id": "25F61E2B-48E8-4E89-8E33-9823A8D40002",
+      "groupID": "D54C3FB6-11E8-447D-A2BB-EF9505087101",
+      "holdingID": "1C687970-A0EE-442D-A6F5-E5714B411001",
+      "ownerID": "4D99EF67-4E8F-4BA6-9E96-1E62E7680010",
+      "type": "created",
+      "symbol": "VOO",
+      "assetName": "Vanguard S&P 500 ETF",
+      "market": "fund",
+      "quantity": 12,
+      "averageCost": 438,
+      "lastPrice": 486,
+      "currency": "USD",
+      "visibility": "full",
+      "note": "核心仓位，按月定投",
+      "createdAt": "2025-06-15T15:06:40.000Z"
+    }
   ]
 }

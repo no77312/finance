@@ -110,4 +110,43 @@ public enum DemoData {
             updatedAt: Date(timeIntervalSince1970: 1_750_090_000)
         )
     ]
+
+    public static let holdingEvents: [HoldingEvent] = [
+        HoldingEvent(
+            groupID: groupID,
+            holdingID: holdings[1].id,
+            ownerID: currentMemberID,
+            type: .updated,
+            symbol: "MSFT",
+            assetName: "Microsoft",
+            market: .usStock,
+            quantity: 8,
+            averageCost: 392,
+            lastPrice: 445,
+            currency: .usd,
+            visibility: .amountOnly,
+            note: "AI 与云业务继续观察",
+            previousQuantity: 6,
+            previousAverageCost: 388,
+            previousLastPrice: 430,
+            previousVisibility: .amountOnly,
+            createdAt: Date(timeIntervalSince1970: 1_750_030_000)
+        ),
+        HoldingEvent(
+            groupID: groupID,
+            holdingID: holdings[0].id,
+            ownerID: currentMemberID,
+            type: .created,
+            symbol: "VOO",
+            assetName: "Vanguard S&P 500 ETF",
+            market: .fund,
+            quantity: 12,
+            averageCost: 438,
+            lastPrice: 486,
+            currency: .usd,
+            visibility: .full,
+            note: "核心仓位，按月定投",
+            createdAt: Date(timeIntervalSince1970: 1_750_000_000)
+        )
+    ]
 }

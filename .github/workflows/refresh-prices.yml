@@ -1,0 +1,26 @@
+name: Refresh closing prices
+
+on:
+  schedule:
+    # 22:30 UTC is 06:30 Asia/Singapore on the next day, safely after the US close.
+    - cron: "30 22 * * 1-5"
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refresh prices
+        env:
+          API_URL: ${{ vars.POSITION_CIRCLE_API_URL || 'https://position-circle-api.onrender.com' }}
+          PRICE_REFRESH_TOKEN: ${{ secrets.PRICE_REFRESH_TOKEN }}
+        run: |
+          if [ -z "$PRICE_REFRESH_TOKEN" ]; then
+            echo "PRICE_REFRESH_TOKEN repository secret is required."
+            exit 1
+          fi
+
+          curl -fsS -X POST "$API_URL/api/admin/prices/refresh" \
+            -H "Authorization: Bearer $PRICE_REFRESH_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{}"

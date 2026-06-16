@@ -49,37 +49,32 @@ struct PositionCircleAPIClient {
         return response.group
     }
 
-    func createHolding(_ holding: Holding) async throws -> Holding {
-        let response: HoldingResponse = try await request(
+    func createHolding(_ holding: Holding) async throws -> HoldingMutationResponse {
+        try await request(
             path: "/api/groups/\(holding.groupID.uuidString)/holdings",
             method: "POST",
             body: holding
         )
-        return response.holding
     }
 
-    func updateHolding(_ holding: Holding) async throws -> Holding {
-        let response: HoldingResponse = try await request(
+    func updateHolding(_ holding: Holding) async throws -> HoldingMutationResponse {
+        try await request(
             path: "/api/groups/\(holding.groupID.uuidString)/holdings/\(holding.id.uuidString)",
             method: "PUT",
             body: holding
         )
-        return response.holding
     }
 
-    func deleteHolding(_ holding: Holding) async throws {
-        let _: EmptyResponse = try await request(
-            path: "/api/groups/\(holding.groupID.uuidString)/holdings/\(holding.id.uuidString)",
-            method: "DELETE"
-        )
-    }
-
-    func refreshPrices(in group: InvestmentGroup) async throws -> PriceRefreshResponse {
-        try await request(
-            path: "/api/groups/\(group.id.uuidString)/prices/refresh",
-            method: "POST",
-            body: EmptyRequest()
-        )
+    func deleteHolding(_ holding: Holding) async throws -> HoldingEvent? {
+        do {
+            let response: HoldingDeletionResponse = try await request(
+                path: "/api/groups/\(holding.groupID.uuidString)/holdings/\(holding.id.uuidString)",
+                method: "DELETE"
+            )
+            return response.event
+        } catch APIError.invalidResponse {
+            return nil
+        }
     }
 
     func parseScreenshotImport(
@@ -116,6 +111,9 @@ struct PositionCircleAPIClient {
         }
 
         if httpResponse.statusCode == 204 {
+            guard Response.self == EmptyResponse.self else {
+                throw APIError.invalidResponse
+            }
             return EmptyResponse() as! Response
         }
 
@@ -163,26 +161,20 @@ struct BootstrapResponse: Decodable {
     var currentMemberID: UUID
     var groups: [InvestmentGroup]
     var holdings: [Holding]
+    var holdingEvents: [HoldingEvent]?
 }
 
 private struct GroupResponse: Decodable {
     var group: InvestmentGroup
 }
 
-private struct HoldingResponse: Decodable {
+struct HoldingMutationResponse: Decodable {
     var holding: Holding
+    var event: HoldingEvent?
 }
 
-struct PriceRefreshResponse: Decodable {
-    var holdings: [Holding]
-    var updatedCount: Int
-    var failed: [PriceRefreshFailure]
-}
-
-struct PriceRefreshFailure: Decodable {
-    var symbol: String
-    var market: AssetMarket
-    var message: String
+private struct HoldingDeletionResponse: Decodable {
+    var event: HoldingEvent?
 }
 
 private struct ServerErrorResponse: Decodable {

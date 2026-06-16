@@ -165,6 +165,90 @@ public struct Holding: Identifiable, Codable, Hashable, Sendable {
     }
 }
 
+public enum HoldingEventType: String, Codable, Sendable {
+    case created
+    case updated
+    case deleted
+
+    public var displayName: String {
+        switch self {
+        case .created: "新增"
+        case .updated: "更新"
+        case .deleted: "删除"
+        }
+    }
+}
+
+public struct HoldingEvent: Identifiable, Codable, Hashable, Sendable {
+    public var id: UUID
+    public var groupID: UUID
+    public var holdingID: UUID
+    public var ownerID: UUID
+    public var type: HoldingEventType
+    public var symbol: String
+    public var assetName: String
+    public var market: AssetMarket
+    public var quantity: Double
+    public var averageCost: Double
+    public var lastPrice: Double
+    public var currency: HoldingCurrency
+    public var visibility: PositionVisibility
+    public var note: String
+    public var previousSymbol: String?
+    public var previousAssetName: String?
+    public var previousQuantity: Double?
+    public var previousAverageCost: Double?
+    public var previousLastPrice: Double?
+    public var previousVisibility: PositionVisibility?
+    public var createdAt: Date
+
+    public init(
+        id: UUID = UUID(),
+        groupID: UUID,
+        holdingID: UUID,
+        ownerID: UUID,
+        type: HoldingEventType,
+        symbol: String,
+        assetName: String,
+        market: AssetMarket,
+        quantity: Double,
+        averageCost: Double,
+        lastPrice: Double,
+        currency: HoldingCurrency,
+        visibility: PositionVisibility,
+        note: String = "",
+        previousSymbol: String? = nil,
+        previousAssetName: String? = nil,
+        previousQuantity: Double? = nil,
+        previousAverageCost: Double? = nil,
+        previousLastPrice: Double? = nil,
+        previousVisibility: PositionVisibility? = nil,
+        createdAt: Date = Date()
+    ) {
+        self.id = id
+        self.groupID = groupID
+        self.holdingID = holdingID
+        self.ownerID = ownerID
+        self.type = type
+        self.symbol = symbol.uppercased()
+        self.assetName = assetName
+        self.market = market
+        self.quantity = quantity
+        self.averageCost = averageCost
+        self.lastPrice = lastPrice
+        self.currency = currency
+        self.visibility = visibility
+        self.note = note
+        self.previousSymbol = previousSymbol?.uppercased()
+        self.previousAssetName = previousAssetName
+        self.previousQuantity = previousQuantity
+        self.previousAverageCost = previousAverageCost
+        self.previousLastPrice = previousLastPrice
+        self.previousVisibility = previousVisibility
+        self.createdAt = createdAt
+    }
+}
+
 public extension Holding {
     var marketValue: Double {
         quantity * lastPrice

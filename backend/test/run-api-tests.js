@@ -20,6 +20,7 @@ main().catch((error) => {
 
 async function main() {
   process.env.PRICE_REFRESH_DISABLED = "1";
+  process.env.PRICE_REFRESH_TOKEN = "test-refresh-token";
 
   const tempDir = await mkdtemp(join(tmpdir(), "position-circle-api-"));
   const store = new FileStore({
@@ -35,6 +36,7 @@ async function main() {
     await servesHealthAndBootstrapData();
     await parsesScreenshotImportDraftsWithoutModelKey();
     await createsHoldingAndIncludesItInAnalytics();
+    await rejectsPriceRefreshWithoutToken();
     await refreshesPricesWithoutBreakingWhenProviderDisabled();
     await updatesAndDeletesOwnedHolding();
     console.log("PositionCircle API checks passed");
@@ -51,6 +53,7 @@ async function servesHealthAndBootstrapData() {
   assert.equal(bootstrap.currentMemberID, memberID);
   assert.equal(bootstrap.groups.length, 1);
   assert.equal(bootstrap.holdings.length, 5);
+  assert.equal(Array.isArray(bootstrap.holdingEvents), true);
 }
 
 async function parsesScreenshotImportDraftsWithoutModelKey() {
@@ -81,11 +84,26 @@ async function parsesScreenshotImportDraftsWithoutModelKey() {
 }
 
 async function refreshesPricesWithoutBreakingWhenProviderDisabled() {
-  const refreshed = await postJson(`/api/groups/${groupID}/prices/refresh`, {});
+  const refreshed = await postJson(`/api/groups/${groupID}/prices/refresh`, {}, refreshHeaders());
 
   assert.equal(refreshed.updatedCount, 0);
   assert.equal(refreshed.holdings.length >= 5, true);
   assert.ok(refreshed.failed.some((item) => item.symbol === "AAPL" || item.symbol === "0700"));
+
+  const scheduledRefresh = await postJson("/api/admin/prices/refresh", {}, refreshHeaders());
+  assert.equal(scheduledRefresh.updatedCount, 0);
+  assert.equal(scheduledRefresh.holdings.length >= 5, true);
+  assert.ok(scheduledRefresh.refreshedAt);
+}
+
+async function rejectsPriceRefreshWithoutToken() {
+  const response = await fetch(`${baseURL}/api/admin/prices/refresh`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{}"
+  });
+
+  assert.equal(response.status, 403);
 }
 
 async function createsHoldingAndIncludesItInAnalytics() {
@@ -103,6 +121,8 @@ async function createsHoldingAndIncludesItInAnalytics() {
 
   assert.equal(created.holding.symbol, "AAPL");
   assert.equal(created.holding.ownerID, memberID);
+  assert.equal(created.event.type, "created");
+  assert.equal(created.event.symbol, "AAPL");
 
   const analytics = await getJson(`/api/groups/${groupID}/analytics`);
   assert.ok(analytics.exposures.some((exposure) => exposure.symbol === "AAPL"));
@@ -138,12 +158,22 @@ async function updatesAndDeletesOwnedHolding() {
   assert.equal(updated.holding.priceDate, null);
   assert.equal(updated.holding.priceSource, "manual");
   assert.equal(updated.holding.priceUpdatedAt, null);
+  assert.equal(updated.event.type, "updated");
+  assert.equal(updated.event.previousQuantity, 1);
+  assert.equal(updated.event.quantity, 2);
 
-  const deleted = await fetch(`${baseURL}/api/groups/${groupID}/holdings/${created.holding.id}`, {
+  const deletedResponse = await fetch(`${baseURL}/api/groups/${groupID}/holdings/${created.holding.id}`, {
     method: "DELETE",
     headers: { "X-Member-ID": memberID }
   });
-  assert.equal(deleted.status, 204);
+  assert.equal(deletedResponse.ok, true);
+  const deleted = await deletedResponse.json();
+  assert.equal(deleted.event.type, "deleted");
+  assert.equal(deleted.event.symbol, "NVDA");
+
+  const events = await getJson(`/api/groups/${groupID}/holding-events`);
+  assert.ok(events.events.some((event) => event.type === "updated" && event.symbol === "NVDA"));
+  assert.ok(events.events.some((event) => event.type === "deleted" && event.symbol === "NVDA"));
 }
 
 async function getJson(path) {
@@ -152,12 +182,13 @@ async function getJson(path) {
   return response.json();
 }
 
-async function postJson(path, body) {
+async function postJson(path, body, extraHeaders = {}) {
   const response = await fetch(`${baseURL}${path}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Member-ID": memberID
+      "X-Member-ID": memberID,
+      ...extraHeaders
     },
     body: JSON.stringify(body)
   });
@@ -176,4 +207,10 @@ async function putJson(path, body) {
   });
   assert.equal(response.ok, true, `${path} returned ${response.status}`);
   return response.json();
+}
+
+function refreshHeaders() {
+  return {
+    Authorization: `Bearer ${process.env.PRICE_REFRESH_TOKEN}`
+  };
 }

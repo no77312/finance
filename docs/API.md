@@ -40,7 +40,7 @@ X-Member-ID: 4D99EF67-4E8F-4BA6-9E96-1E62E7680010
 
 ### GET /api/bootstrap
 
-返回 iOS 启动所需的群组、持仓和当前成员 ID。
+返回 iOS 启动所需的群组、持仓、持仓变动事件和当前成员 ID。
 
 ### GET /api/groups
 
@@ -64,6 +64,10 @@ X-Member-ID: 4D99EF67-4E8F-4BA6-9E96-1E62E7680010
 ### GET /api/groups/:groupID/holdings
 
 返回群组持仓列表。
+
+### GET /api/groups/:groupID/holding-events
+
+返回群组持仓变动事件。带 `X-Member-ID` 时只返回该成员的事件。
 
 ### POST /api/groups/:groupID/holdings
 
@@ -89,7 +93,32 @@ X-Member-ID: 4D99EF67-4E8F-4BA6-9E96-1E62E7680010
 
 ### DELETE /api/groups/:groupID/holdings/:holdingID
 
-删除自己的持仓。
+删除自己的持仓，并返回一条 `deleted` 事件。
+
+### POST /api/admin/prices/refresh
+
+刷新所有群组的最近一个交易日收盘价。用于 GitHub Actions 或 Render Cron 等定时任务，不由 iOS 手动调用。
+
+必须带刷新密钥：
+
+```text
+Authorization: Bearer 你的 PRICE_REFRESH_TOKEN
+```
+
+响应示例：
+
+```json
+{
+  "holdings": [],
+  "updatedCount": 0,
+  "failed": [],
+  "refreshedAt": "2026-06-16T06:30:00.000Z"
+}
+```
+
+### POST /api/groups/:groupID/prices/refresh
+
+刷新单个群组的最近一个交易日收盘价，同样需要 `PRICE_REFRESH_TOKEN`。主要用于调试。
 
 ### GET /api/groups/:groupID/analytics
 

@@ -19,7 +19,7 @@ export class FileStore {
   async read() {
     await this.init();
     const raw = await readFile(this.dataFile, "utf8");
-    return JSON.parse(raw);
+    return normalizeStoreData(JSON.parse(raw));
   }
 
   async write(data) {
@@ -38,4 +38,11 @@ export class FileStore {
     await this.write(data);
     return result;
   }
+}
+
+function normalizeStoreData(data) {
+  data.groups ??= [];
+  data.holdings ??= [];
+  data.holdingEvents ??= [];
+  return data;
 }
