@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { FileStore } from "../src/store.js";
 import { createPositionCircleServer } from "../src/server.js";
+import { parseScreenshotImport } from "../src/importParser.js";
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const seedFile = join(testDir, "..", "data", "seed.json");
@@ -35,6 +36,7 @@ async function main() {
   try {
     await servesHealthAndBootstrapData();
     await parsesScreenshotImportDraftsWithoutModelKey();
+    await correctsModelPriceCostOrderFromMarketValue();
     await createsHoldingAndIncludesItInAnalytics();
     await rejectsPriceRefreshWithoutToken();
     await refreshesPricesWithoutBreakingWhenProviderDisabled();
@@ -79,6 +81,58 @@ async function parsesScreenshotImportDraftsWithoutModelKey() {
   } finally {
     if (previousKey) {
       process.env.OPENAI_API_KEY = previousKey;
+    }
+  }
+}
+
+async function correctsModelPriceCostOrderFromMarketValue() {
+  const previousFetch = globalThis.fetch;
+  const previousKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = "test-key";
+
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    output_text: JSON.stringify({
+      holdings: [
+        {
+          symbol: "GOOGL",
+          assetName: "谷歌-A",
+          market: "usStock",
+          quantity: 55,
+          averageCost: 369,
+          lastPrice: 385.473,
+          marketValue: 20295,
+          currency: "USD",
+          visibility: "amountOnly",
+          confidence: 0.95,
+          note: "",
+          rawText: "谷歌-A GOOGL 20,295.00 55 369.00 385.473 -19.25"
+        }
+      ],
+      warnings: []
+    })
+  }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" }
+  });
+
+  try {
+    const parsed = await parseScreenshotImport({
+      defaultVisibility: "amountOnly",
+      ocrText: [
+        "名称代码 市值/数量 现价/成本 今日盈亏",
+        "谷歌-A GOOGL 20,295.00 55 369.00 385.473 -19.25"
+      ].join("\n")
+    });
+
+    assert.equal(parsed.source, "model");
+    assert.equal(parsed.holdings[0].lastPrice, 369);
+    assert.equal(parsed.holdings[0].averageCost, 385.473);
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (previousKey) {
+      process.env.OPENAI_API_KEY = previousKey;
+    } else {
+      delete process.env.OPENAI_API_KEY;
     }
   }
 }

@@ -120,6 +120,9 @@ async function parseWithOpenAI({ text, visibility, brokerHint, locale }) {
                   "market 只能是 usStock、hkStock、cnStock、fund、crypto、cash。",
                   "currency 只能是 USD、HKD、CNY、SGD。",
                   "visibility 使用用户默认值。",
+                  "如果截图列名是“市值/数量”，同一行上方数字是市值，下方数字是数量。",
+                  "如果截图列名是“现价/成本”，同一行上方数字是现价 lastPrice，下方数字是持仓成本 averageCost。",
+                  "可用 市值 ÷ 数量 校验现价；不要把成本价和现价调换。",
                   "confidence 取 0 到 1，低于 0.7 的记录仍可返回，但要在 warnings 说明。"
                 ].join("\n")
               }
@@ -259,15 +262,21 @@ function normalizeDrafts(drafts = [], fallbackVisibility) {
         ? draft.currency
         : currencyFromText(draft.rawText ?? "", symbol);
       const visibility = positionVisibilities.has(draft.visibility) ? draft.visibility : fallbackVisibility;
+      const normalizedPrices = normalizePriceAndCost({
+        quantity: optionalPositive(draft.quantity),
+        averageCost: optionalNonNegative(draft.averageCost),
+        lastPrice: optionalNonNegative(draft.lastPrice),
+        marketValue: optionalNonNegative(draft.marketValue)
+      });
 
       return {
         symbol,
         assetName: cleanString(draft.assetName) || symbol,
         market,
-        quantity: optionalPositive(draft.quantity),
-        averageCost: optionalNonNegative(draft.averageCost),
-        lastPrice: optionalNonNegative(draft.lastPrice),
-        marketValue: optionalNonNegative(draft.marketValue),
+        quantity: normalizedPrices.quantity,
+        averageCost: normalizedPrices.averageCost,
+        lastPrice: normalizedPrices.lastPrice,
+        marketValue: normalizedPrices.marketValue,
         currency,
         visibility,
         confidence: clamp(Number(draft.confidence), 0, 1) || 0.4,
@@ -276,6 +285,37 @@ function normalizeDrafts(drafts = [], fallbackVisibility) {
       };
     })
     .filter(Boolean);
+}
+
+function normalizePriceAndCost({ quantity, averageCost, lastPrice, marketValue }) {
+  if (
+    quantity
+    && marketValue
+    && averageCost !== null
+    && lastPrice !== null
+    && pricesAreClose(marketValue / quantity, averageCost)
+    && !pricesAreClose(marketValue / quantity, lastPrice)
+  ) {
+    return {
+      quantity,
+      averageCost: lastPrice,
+      lastPrice: averageCost,
+      marketValue
+    };
+  }
+
+  return {
+    quantity,
+    averageCost,
+    lastPrice,
+    marketValue
+  };
+}
+
+function pricesAreClose(first, second) {
+  const difference = Math.abs(Number(first) - Number(second));
+  const scale = Math.max(1, Math.abs(Number(first)), Math.abs(Number(second)));
+  return difference / scale <= 0.01 || difference <= 0.05;
 }
 
 function dedupeDrafts(drafts) {
