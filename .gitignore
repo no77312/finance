@@ -15,4 +15,4 @@ npm-debug.log*
 backend/data/store.json
 
 # Local verification artifacts
-simulator-screenshot.png
+simulator-*.png
