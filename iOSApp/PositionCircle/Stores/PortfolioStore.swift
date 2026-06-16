@@ -77,6 +77,26 @@ final class PortfolioStore: ObservableObject {
         }
     }
 
+    func parseScreenshotImport(
+        ocrText: String,
+        defaultVisibility: PositionVisibility
+    ) async throws -> ScreenshotImportResponse {
+        isSyncing = true
+        defer { isSyncing = false }
+
+        do {
+            let response = try await apiClient.parseScreenshotImport(
+                ocrText: ocrText,
+                defaultVisibility: defaultVisibility
+            )
+            backendStatus = response.source == "model" ? "大模型解析完成" : "基础解析完成"
+            return response
+        } catch {
+            backendStatus = "截图解析失败"
+            throw error
+        }
+    }
+
     func createGroup(name: String, subtitle: String) {
         let group = InvestmentGroup(
             name: name,

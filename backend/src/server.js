@@ -10,6 +10,7 @@ import {
   notFound,
   summariesByCurrency
 } from "./domain.js";
+import { parseScreenshotImport } from "./importParser.js";
 
 export function createPositionCircleServer({ store }) {
   return createServer(async (request, response) => {
@@ -54,6 +55,7 @@ async function routeRequest(request, response, store) {
         "GET /api/groups",
         "POST /api/groups",
         "GET /api/groups/:groupID",
+        "POST /api/imports/parse-screenshot",
         "GET /api/groups/:groupID/holdings",
         "POST /api/groups/:groupID/holdings",
         "PUT /api/groups/:groupID/holdings/:holdingID",
@@ -61,6 +63,12 @@ async function routeRequest(request, response, store) {
         "GET /api/groups/:groupID/analytics"
       ]
     });
+  }
+
+  if (parts[1] === "imports" && request.method === "POST" && parts.length === 3 && parts[2] === "parse-screenshot") {
+    const body = await readJsonBody(request);
+    const result = await parseScreenshotImport(body);
+    return send(response, 200, result);
   }
 
   if (parts[1] !== "groups") {

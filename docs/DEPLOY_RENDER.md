@@ -85,6 +85,27 @@ disk:
 
 只有 `/var/data` 下面的文件会被持久化。后端通过 `DATA_FILE=/var/data/store.json` 把持仓数据写入这个磁盘。
 
+## 截图导入的大模型解析
+
+截图导入会先在 iOS 本地做 OCR，然后把识别出的文字发给后端解析。后端支持两种模式：
+
+- 配置了 `OPENAI_API_KEY`：使用大模型结构化解析。
+- 未配置 `OPENAI_API_KEY`：使用基础规则解析，仍可跑通，但需要更多人工确认。
+
+在 Render 服务的 `Environment` 里添加：
+
+```text
+OPENAI_API_KEY=你的 OpenAI API Key
+```
+
+可选配置模型：
+
+```text
+OPENAI_MODEL=gpt-4.1-mini
+```
+
+改完环境变量后，点击 Render 的 `Manual Deploy` 或等待自动部署生效。
+
 ## 接入 iOS App
 
 当前 iOS App 已默认连接：

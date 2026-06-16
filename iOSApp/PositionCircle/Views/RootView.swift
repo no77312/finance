@@ -12,6 +12,7 @@ struct RootView: View {
     @StateObject private var store = PortfolioStore()
     @State private var selectedTab: GroupTab = .overview
     @State private var isShowingPositionForm = false
+    @State private var isShowingScreenshotImport = false
     @State private var isShowingNewGroup = false
     @State private var editingHolding: Holding?
 
@@ -57,6 +58,12 @@ struct RootView: View {
                             Label("提交持仓", systemImage: "plus.circle.fill")
                         }
 
+                        Button {
+                            isShowingScreenshotImport = true
+                        } label: {
+                            Label("截图导入", systemImage: "camera.viewfinder")
+                        }
+
                         Menu {
                             ForEach(store.groups) { group in
                                 Button {
@@ -94,6 +101,13 @@ struct RootView: View {
             .sheet(isPresented: $isShowingNewGroup) {
                 NavigationStack {
                     NewGroupView(store: store)
+                }
+            }
+            .sheet(isPresented: $isShowingScreenshotImport) {
+                if let group = store.selectedGroup {
+                    NavigationStack {
+                        ScreenshotImportView(store: store, group: group)
+                    }
                 }
             }
             .task {

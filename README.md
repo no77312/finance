@@ -4,9 +4,10 @@
 
 ## 已完成内容
 
-- SwiftUI iOS 原型：群组首页、总览、我的持仓、成员列表、提交/编辑/删除持仓、新建群组。
+- SwiftUI iOS 原型：群组首页、总览、我的持仓、成员列表、提交/编辑/删除持仓、截图导入、新建群组。
 - Node 后端：本地 API、文件持久化、群组/持仓 CRUD、聚合分析接口。
 - iOS 网络层：启动拉取后端数据，保存/删除同步后端，后端不可用时回退到演示数据。
+- 截图导入：iOS 本地 OCR 识别截图文字，后端可用 OpenAI 大模型解析成持仓草稿，确认后写入。
 - 核心业务模块：成员、群组、持仓、可见性、币种、按标的聚合、按币种汇总。
 - 隐私基础能力：支持完整可见、隐藏成本、仅标的三种可见性。
 - Xcode 工程：`iOSApp/PositionCircle.xcodeproj`。
@@ -46,6 +47,17 @@ https://position-circle-api.onrender.com
 ```
 
 如果要调试本地后端，可以把 `PositionCircleAPIClient` 里的 `baseURL` 临时改回 `http://127.0.0.1:8787`。在 iOS Simulator 中，这个地址会指向本机 Mac；真机调试时需要改成 Mac 的局域网 IP。
+
+## 截图导入配置
+
+截图导入不要求上传原图。iOS 会先在本地 OCR，然后把文字发给后端解析。
+
+后端未配置 `OPENAI_API_KEY` 时，会使用基础规则解析；配置后会使用大模型解析：
+
+```text
+OPENAI_API_KEY=你的 OpenAI API Key
+OPENAI_MODEL=gpt-4.1-mini
+```
 
 ## Render 部署
 

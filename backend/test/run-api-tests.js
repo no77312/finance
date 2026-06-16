@@ -31,6 +31,7 @@ async function main() {
 
   try {
     await servesHealthAndBootstrapData();
+    await parsesScreenshotImportDraftsWithoutModelKey();
     await createsHoldingAndIncludesItInAnalytics();
     await updatesAndDeletesOwnedHolding();
     console.log("PositionCircle API checks passed");
@@ -47,6 +48,32 @@ async function servesHealthAndBootstrapData() {
   assert.equal(bootstrap.currentMemberID, memberID);
   assert.equal(bootstrap.groups.length, 1);
   assert.equal(bootstrap.holdings.length, 5);
+}
+
+async function parsesScreenshotImportDraftsWithoutModelKey() {
+  const previousKey = process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+
+  try {
+    const parsed = await postJson("/api/imports/parse-screenshot", {
+      defaultVisibility: "amountOnly",
+      ocrText: [
+        "AAPL Apple Inc.",
+        "数量 3 平均成本 180 现价 210 USD",
+        "0700 Tencent Holdings",
+        "数量 200 成本 320 现价 386 HKD"
+      ].join("\n")
+    });
+
+    assert.equal(parsed.source, "fallback");
+    assert.ok(parsed.holdings.some((holding) => holding.symbol === "AAPL"));
+    assert.ok(parsed.holdings.some((holding) => holding.symbol === "0700"));
+    assert.equal(parsed.holdings.find((holding) => holding.symbol === "AAPL").visibility, "amountOnly");
+  } finally {
+    if (previousKey) {
+      process.env.OPENAI_API_KEY = previousKey;
+    }
+  }
 }
 
 async function createsHoldingAndIncludesItInAnalytics() {

@@ -23,6 +23,7 @@
 		200000000000000000000014 /* PortfolioAnalytics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000014 /* PortfolioAnalytics.swift */; };
 		200000000000000000000015 /* DemoData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000015 /* DemoData.swift */; };
 		200000000000000000000016 /* PositionCircleAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000017 /* PositionCircleAPIClient.swift */; };
+		200000000000000000000017 /* ScreenshotImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000018 /* ScreenshotImportView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -43,6 +44,7 @@
 		100000000000000000000015 /* DemoData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoData.swift; sourceTree = "<group>"; };
 		100000000000000000000016 /* PositionCircle.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PositionCircle.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		100000000000000000000017 /* PositionCircleAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PositionCircleAPIClient.swift; sourceTree = "<group>"; };
+		100000000000000000000018 /* ScreenshotImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotImportView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -92,6 +94,7 @@
 				100000000000000000000004 /* MyHoldingsView.swift */,
 				100000000000000000000005 /* MembersView.swift */,
 				100000000000000000000006 /* PositionFormView.swift */,
+				100000000000000000000018 /* ScreenshotImportView.swift */,
 				100000000000000000000007 /* NewGroupView.swift */,
 				100000000000000000000008 /* SharedViews.swift */,
 			);
@@ -211,6 +214,7 @@
 				200000000000000000000004 /* MyHoldingsView.swift in Sources */,
 				200000000000000000000005 /* MembersView.swift in Sources */,
 				200000000000000000000006 /* PositionFormView.swift in Sources */,
+				200000000000000000000017 /* ScreenshotImportView.swift in Sources */,
 				200000000000000000000007 /* NewGroupView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

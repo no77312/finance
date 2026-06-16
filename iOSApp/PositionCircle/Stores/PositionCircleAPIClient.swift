@@ -74,6 +74,20 @@ struct PositionCircleAPIClient {
         )
     }
 
+    func parseScreenshotImport(
+        ocrText: String,
+        defaultVisibility: PositionVisibility
+    ) async throws -> ScreenshotImportResponse {
+        try await request(
+            path: "/api/imports/parse-screenshot",
+            method: "POST",
+            body: ScreenshotImportRequest(
+                ocrText: ocrText,
+                defaultVisibility: defaultVisibility
+            )
+        )
+    }
+
     private func request<Response: Decodable, Body: Encodable>(
         path: String,
         method: String = "GET",
@@ -163,6 +177,48 @@ private struct ServerErrorResponse: Decodable {
 private struct NewGroupRequest: Encodable {
     var name: String
     var subtitle: String
+}
+
+struct ScreenshotImportResponse: Decodable {
+    var source: String
+    var holdings: [ScreenshotImportDraft]
+    var warnings: [String]
+}
+
+struct ScreenshotImportDraft: Decodable, Identifiable {
+    var id = UUID()
+    var symbol: String
+    var assetName: String
+    var market: AssetMarket
+    var quantity: Double?
+    var averageCost: Double?
+    var lastPrice: Double?
+    var marketValue: Double?
+    var currency: HoldingCurrency
+    var visibility: PositionVisibility
+    var confidence: Double
+    var note: String
+    var rawText: String
+
+    enum CodingKeys: String, CodingKey {
+        case symbol
+        case assetName
+        case market
+        case quantity
+        case averageCost
+        case lastPrice
+        case marketValue
+        case currency
+        case visibility
+        case confidence
+        case note
+        case rawText
+    }
+}
+
+private struct ScreenshotImportRequest: Encodable {
+    var ocrText: String
+    var defaultVisibility: PositionVisibility
 }
 
 private struct EmptyRequest: Encodable {}
