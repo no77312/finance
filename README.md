@@ -39,7 +39,13 @@ http://127.0.0.1:8787
 
 3. 点击 Run。
 
-iOS App 默认连接 `http://127.0.0.1:8787`。在 iOS Simulator 中，这个地址会指向本机 Mac。真机调试时需要把 `PositionCircleAPIClient` 里的 `baseURL` 改成 Mac 的局域网 IP；部署后则改成 Render 提供的 HTTPS 地址。
+iOS App 默认连接线上 Render 后端：
+
+```text
+https://position-circle-api.onrender.com
+```
+
+如果要调试本地后端，可以把 `PositionCircleAPIClient` 里的 `baseURL` 临时改回 `http://127.0.0.1:8787`。在 iOS Simulator 中，这个地址会指向本机 Mac；真机调试时需要改成 Mac 的局域网 IP。
 
 ## Render 部署
 

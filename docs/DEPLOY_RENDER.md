@@ -87,16 +87,16 @@ disk:
 
 ## 接入 iOS App
 
-部署成功后，把 `PositionCircleAPIClient.swift` 里的本地地址：
-
-```swift
-URL(string: "http://127.0.0.1:8787")!
-```
-
-改成 Render 地址：
+当前 iOS App 已默认连接：
 
 ```swift
 URL(string: "https://position-circle-api.onrender.com")!
+```
+
+如果你改了 Render 服务名或绑定了自定义域名，再把它替换成新的 HTTPS 地址：
+
+```swift
+URL(string: "https://你的后端域名")!
 ```
 
 然后重新编译 iOS App。

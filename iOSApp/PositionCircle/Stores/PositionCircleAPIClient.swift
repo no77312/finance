@@ -8,7 +8,7 @@ struct PositionCircleAPIClient {
     private let encoder: JSONEncoder
 
     init(
-        baseURL: URL = URL(string: "http://127.0.0.1:8787")!,
+        baseURL: URL = URL(string: "https://position-circle-api.onrender.com")!,
         currentMemberID: UUID = DemoData.currentMemberID
     ) {
         self.baseURL = baseURL
