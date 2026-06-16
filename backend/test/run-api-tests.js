@@ -117,7 +117,10 @@ async function updatesAndDeletesOwnedHolding() {
     averageCost: 100,
     lastPrice: 110,
     currency: "USD",
-    visibility: "amountOnly"
+    visibility: "amountOnly",
+    priceDate: "2026-06-15",
+    priceSource: "alpha_vantage:NVDA",
+    priceUpdatedAt: "2026-06-16T00:00:00.000Z"
   });
 
   const updated = await putJson(`/api/groups/${groupID}/holdings/${created.holding.id}`, {
@@ -132,6 +135,9 @@ async function updatesAndDeletesOwnedHolding() {
   });
   assert.equal(updated.holding.quantity, 2);
   assert.equal(updated.holding.visibility, "full");
+  assert.equal(updated.holding.priceDate, null);
+  assert.equal(updated.holding.priceSource, "manual");
+  assert.equal(updated.holding.priceUpdatedAt, null);
 
   const deleted = await fetch(`${baseURL}/api/groups/${groupID}/holdings/${created.holding.id}`, {
     method: "DELETE",

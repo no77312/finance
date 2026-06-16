@@ -126,6 +126,18 @@ export function normalizeHoldingInput(body, groupID, ownerID, existingHolding = 
   const averageCost = nonNegativeNumber(body.averageCost, "averageCost");
   const lastPrice = nonNegativeNumber(body.lastPrice, "lastPrice");
   const requestedID = cleanString(body.id).toUpperCase();
+  const lastPriceWasChanged = Boolean(
+    existingHolding
+      && hasOwn(body, "lastPrice")
+      && Number(lastPrice) !== Number(existingHolding.lastPrice)
+  );
+  const priceDate = optionalCleanString(body, "priceDate", lastPriceWasChanged ? null : existingHolding?.priceDate ?? null);
+  const priceSource = priceSourceForInput(body, lastPriceWasChanged ? "manual" : existingHolding?.priceSource ?? "manual");
+  const priceUpdatedAt = optionalCleanString(
+    body,
+    "priceUpdatedAt",
+    lastPriceWasChanged ? null : existingHolding?.priceUpdatedAt ?? null
+  );
 
   return {
     id: existingHolding?.id ?? (requestedID || randomUUID().toUpperCase()),
@@ -140,9 +152,9 @@ export function normalizeHoldingInput(body, groupID, ownerID, existingHolding = 
     currency,
     visibility,
     note: cleanString(body.note),
-    priceDate: cleanString(body.priceDate) || existingHolding?.priceDate || null,
-    priceSource: cleanString(body.priceSource) || existingHolding?.priceSource || "manual",
-    priceUpdatedAt: cleanString(body.priceUpdatedAt) || existingHolding?.priceUpdatedAt || null,
+    priceDate,
+    priceSource,
+    priceUpdatedAt,
     updatedAt: new Date().toISOString()
   };
 }
@@ -199,6 +211,24 @@ function groupBy(items, keyForItem) {
 
 function cleanString(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function optionalCleanString(body, fieldName, fallback) {
+  if (!hasOwn(body, fieldName)) {
+    return fallback;
+  }
+  return cleanString(body[fieldName]) || null;
+}
+
+function priceSourceForInput(body, fallback) {
+  if (!hasOwn(body, "priceSource")) {
+    return fallback;
+  }
+  return cleanString(body.priceSource) || "manual";
+}
+
+function hasOwn(object, fieldName) {
+  return Object.prototype.hasOwnProperty.call(object, fieldName);
 }
 
 function positiveNumber(value, fieldName) {
