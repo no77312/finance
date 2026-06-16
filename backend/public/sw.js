@@ -1,10 +1,13 @@
-const CACHE_NAME = "position-circle-shell-v1";
+const CACHE_NAME = "position-circle-shell-v2";
 const SHELL_ASSETS = [
   "/",
   "/styles.css",
   "/app.js",
   "/manifest.webmanifest",
-  "/icons/icon.svg"
+  "/icons/icon.svg",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
+  "/icons/apple-touch-icon.png"
 ];
 
 self.addEventListener("install", (event) => {
