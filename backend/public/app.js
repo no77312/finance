@@ -99,8 +99,26 @@ function bindEvents() {
       return;
     }
 
+    if (action === "select-group") {
+      state.activeGroupID = value;
+      state.selectedMemberID = "";
+      state.sheet = "";
+      clearNotice();
+      render();
+      return;
+    }
+
     if (action === "select-member") {
       state.selectedMemberID = value;
+      render();
+      return;
+    }
+
+    if (action === "open-member") {
+      state.activeTab = "members";
+      state.selectedMemberID = value;
+      state.sheet = "";
+      clearNotice();
       render();
       return;
     }
@@ -122,14 +140,6 @@ function bindEvents() {
     if (action === "import-drafts") {
       importDrafts();
       return;
-    }
-  });
-
-  app.addEventListener("change", (event) => {
-    if (event.target.matches("#groupSelect")) {
-      state.activeGroupID = event.target.value;
-      state.selectedMemberID = "";
-      render();
     }
   });
 
@@ -204,11 +214,10 @@ function renderApp() {
   const data = state.data ?? { groups: [], holdings: [], holdingEvents: [], portfolioSnapshots: [] };
   const groups = data.groups ?? [];
   const activeGroup = activeGroupFor(groups);
-  const user = state.session.user ?? data.user;
 
   app.className = "app-shell";
   app.innerHTML = `
-    ${topbarHTML(user, groups, activeGroup)}
+    ${topbarHTML(groups, activeGroup)}
     ${activeGroup ? mainContentHTML(activeGroup) : emptyWorkspaceHTML()}
     ${tabbarHTML()}
     ${sheetHTML(activeGroup)}
@@ -216,26 +225,39 @@ function renderApp() {
   `;
 }
 
-function topbarHTML(user, groups, activeGroup) {
+function topbarHTML(groups, activeGroup) {
+  const groupLabel = activeGroup?.name || "持仓圈";
   return `
     <header class="topbar">
       <div class="topbar-row">
-        <div class="account">
-          ${avatarHTML(user)}
-          <div class="min-w-0">
-            <div class="account-name">${escapeHTML(user?.displayName || "持仓圈用户")}</div>
-            <div class="account-mail">${escapeHTML(user?.email || "Google 登录")}</div>
-          </div>
+        <div class="topbar-copy min-w-0">
+          <div class="topbar-label">持仓圈</div>
+          <div class="topbar-heading">${escapeHTML(groupLabel)}</div>
         </div>
-        <button class="text-button" type="button" data-action="sign-out">退出</button>
+        <button class="secondary-button compact-button" type="button" data-action="sheet" data-value="groups">群组</button>
       </div>
-      <div class="group-control">
-        <select id="groupSelect" class="group-select" ${groups.length ? "" : "disabled"}>
-          ${groups.map((group) => `<option value="${escapeAttr(group.id)}" ${group.id === activeGroup?.id ? "selected" : ""}>${escapeHTML(group.name)}</option>`).join("")}
-        </select>
-        <button class="icon-button" type="button" data-action="sheet" data-value="groups" aria-label="群组">＋</button>
+      <div class="topbar-meta-row">
+        ${activeGroup ? `
+          <span>${escapeHTML(activeGroup.subtitle || "共享持仓与观点")}</span>
+          <span>${activeGroup.members?.length ?? 0} 人</span>
+          <span>邀请码 ${escapeHTML(activeGroup.inviteCode || "")}</span>
+        ` : `<span>创建或加入一个群组开始共享持仓。</span>`}
       </div>
+      ${groups.length ? `
+        <div class="group-switcher" role="tablist" aria-label="群组切换">
+          ${groups.map((group) => groupChipHTML(group, group.id === activeGroup?.id)).join("")}
+        </div>
+      ` : ""}
     </header>
+  `;
+}
+
+function groupChipHTML(group, active) {
+  return `
+    <button class="group-chip ${active ? "active" : ""}" type="button" data-action="select-group" data-value="${escapeAttr(group.id)}" aria-pressed="${active ? "true" : "false"}">
+      <span class="group-chip-name">${escapeHTML(group.name)}</span>
+      <span class="group-chip-meta">${group.members?.length ?? 0} 人</span>
+    </button>
   `;
 }
 
@@ -269,23 +291,34 @@ function overviewHTML(group) {
   const recent = holdings.slice().sort(byUpdatedAt).slice(0, 5);
 
   return `
-    <main class="content">
+    <main class="content overview-layout">
       <section class="section">
-        <div class="metric-grid grid">
-          ${metricHTML("可见市值", money(summary.marketValue, "USD"))}
-          ${metricHTML("浮动盈亏", signedMoney(summary.pnl, "USD"), summary.pnl)}
-          ${metricHTML("持仓数", String(holdings.length))}
-          ${metricHTML("成员数", String(group.members?.length ?? 0))}
+        <div class="panel group-overview-panel">
+          <div class="overview-heading">
+            <div>
+              <div class="topbar-label">群组概况</div>
+              <h2 class="section-title">${escapeHTML(group.name)}</h2>
+              <div class="subtle">${escapeHTML(group.subtitle || "共享持仓与观点")}</div>
+            </div>
+            <span class="pill blue">邀请码 ${escapeHTML(group.inviteCode || "")}</span>
+          </div>
+          <div class="metric-grid grid">
+            ${metricHTML("可见市值", money(summary.marketValue, "USD"))}
+            ${metricHTML("浮动盈亏", signedMoney(summary.pnl, "USD"), summary.pnl)}
+            ${metricHTML("持仓数", String(holdings.length))}
+            ${metricHTML("成员数", String(group.members?.length ?? 0))}
+          </div>
         </div>
         <div class="section-header">
           <h2 class="section-title">共识标的</h2>
-          <span class="subtle">${escapeHTML(group.inviteCode || "")}</span>
+          <span class="subtle">${exposures.length} 项</span>
         </div>
         <div class="list">
           ${exposures.length ? exposures.map(exposureHTML).join("") : `<div class="empty">暂无可见持仓。</div>`}
         </div>
       </section>
-      <section class="section">
+      ${overviewMembersSectionHTML(group)}
+      <section class="section section-wide">
         <div class="section-header">
           <h2 class="section-title">最近更新</h2>
           <button class="primary-button" type="button" data-action="sheet" data-value="submit">提交持仓</button>
@@ -322,6 +355,7 @@ function membersHTML(group) {
 }
 
 function mineHTML(group) {
+  const user = state.session.user ?? state.data?.user;
   const events = (state.data?.holdingEvents ?? [])
     .filter((event) => event.groupID === group.id && event.ownerID === state.session.currentMemberID)
     .sort((first, second) => new Date(second.createdAt) - new Date(first.createdAt))
@@ -329,6 +363,7 @@ function mineHTML(group) {
 
   return `
     <main class="content">
+      ${myProfileHTML(user, group)}
       ${portfolioSectionHTML(group, state.session.currentMemberID, {
         title: "我的持仓",
         editable: true,
@@ -349,12 +384,36 @@ function mineHTML(group) {
   `;
 }
 
+function myProfileHTML(user, group) {
+  const groupCount = state.data?.groups?.length ?? 0;
+  return `
+    <section class="section section-wide">
+      <div class="panel profile-card">
+        <div class="profile-card-head">
+          <div class="account">
+            ${avatarHTML(user)}
+            <div class="min-w-0">
+              <div class="account-name">${escapeHTML(user?.displayName || "持仓圈用户")}</div>
+              <div class="account-mail">${escapeHTML(user?.email || "Google 登录")}</div>
+            </div>
+          </div>
+          <button class="text-button compact-button" type="button" data-action="sign-out">退出</button>
+        </div>
+        <div class="profile-meta-row">
+          <span>当前群组 ${escapeHTML(group.name)}</span>
+          <span>已加入 ${groupCount} 个群组</span>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
 function portfolioSectionHTML(group, ownerID, options = {}) {
   const holdings = groupHoldings(group.id).filter((holding) => holding.ownerID === ownerID);
   const insights = buildPortfolioInsights(group.id, ownerID, holdings);
 
   return `
-    <section class="section">
+    <section class="section ${escapeAttr(options.sectionClass || "")}">
       <div class="section-header">
         <h2 class="section-title">${escapeHTML(options.title || "持仓")}</h2>
         ${options.actionLabel ? `<button class="primary-button" type="button" data-action="sheet" data-value="submit">${escapeHTML(options.actionLabel)}</button>` : `<span class="subtle">${holdings.length} 项</span>`}
@@ -371,6 +430,117 @@ function portfolioSectionHTML(group, ownerID, options = {}) {
       </div>
     </section>
   `;
+}
+
+function overviewMembersSectionHTML(group) {
+  const members = group.members ?? [];
+  return `
+    <section class="section">
+      <div class="section-header">
+        <h2 class="section-title">成员组合</h2>
+        <span class="subtle">${members.length} 人</span>
+      </div>
+      <div class="member-overview-grid">
+        ${members.map((member) => memberOverviewCardHTML(member, group.id)).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function memberOverviewCardHTML(member, groupID) {
+  const holdings = groupHoldings(groupID).filter((holding) => holding.ownerID === member.id);
+  const insights = buildPortfolioInsights(groupID, member.id, holdings);
+  const summary = visibleSummary(holdings);
+  const latestActivity = latestActivityAt(holdings, insights.latestSnapshotAt);
+  const primaryValue = memberPrimaryValue(summary, holdings, insights);
+  const caption = memberOverviewCaption(holdings, insights);
+
+  return `
+    <button class="list-item member-overview-card" type="button" data-action="open-member" data-value="${escapeAttr(member.id)}">
+      <div class="member-overview-head">
+        <div class="account">
+          ${avatarHTML(member)}
+          <div class="min-w-0">
+            <div class="member-name">${escapeHTML(member.displayName)}</div>
+            <div class="member-meta">${escapeHTML(caption)}</div>
+          </div>
+        </div>
+        <div class="value-stack">
+          <div class="member-overview-value">${escapeHTML(primaryValue)}</div>
+          <div class="value-caption">${holdings.length ? `最大仓位 ${formatPercent(insights.maxWeight)}` : "等待提交"}</div>
+        </div>
+      </div>
+      ${miniAllocationHTML(insights.topSlices, "member-allocation-strip")}
+      <div class="member-symbol-row">
+        ${memberTopSymbolsHTML(insights, holdings)}
+      </div>
+      <div class="member-card-meta">
+        <span>前三集中 ${formatPercent(insights.top3Weight)}</span>
+        <span>${latestActivity ? `更新 ${formatDateTime(latestActivity)}` : "暂无更新"}</span>
+      </div>
+    </button>
+  `;
+}
+
+function latestActivityAt(holdings, fallback = null) {
+  const latestHolding = holdings.slice().sort(byUpdatedAt)[0];
+  const latestHoldingAt = latestHolding?.updatedAt ?? null;
+  if (!latestHoldingAt) {
+    return fallback;
+  }
+  if (!fallback) {
+    return latestHoldingAt;
+  }
+  return new Date(latestHoldingAt) > new Date(fallback) ? latestHoldingAt : fallback;
+}
+
+function memberPrimaryValue(summary, holdings, insights) {
+  if (summary.marketValue > 0) {
+    return money(summary.marketValue, "USD");
+  }
+  if (holdings.length) {
+    return insights.hiddenCount === holdings.length ? "仅公开标的" : "暂无可见";
+  }
+  return "未提交";
+}
+
+function memberOverviewCaption(holdings, insights) {
+  if (!holdings.length) {
+    return "等待首次提交";
+  }
+  if (insights.hiddenCount > 0) {
+    return `公开 ${insights.visibleCount}/${holdings.length} 项持仓`;
+  }
+  return `${holdings.length} 项持仓`;
+}
+
+function miniAllocationHTML(slices, className = "") {
+  if (!slices.length) {
+    return "";
+  }
+
+  return `
+    <div class="allocation-strip ${escapeAttr(className)}" aria-hidden="true">
+      ${slices.map((slice, index) => `
+        <div class="allocation-segment tone-${index % 6}" style="width: ${Math.max(slice.weight * 100, 0)}%;"></div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function memberTopSymbolsHTML(insights, holdings) {
+  if (!insights.topSlices.length) {
+    return holdings.length
+      ? `<span class="legend-chip">仅公开标的</span>`
+      : `<span class="legend-chip">等待提交</span>`;
+  }
+
+  return insights.topSlices.slice(0, 3).map((slice, index) => `
+    <span class="legend-chip tone-${index % 6}">
+      <strong>${escapeHTML(slice.symbol)}</strong>
+      <span>${escapeHTML(formatPercent(slice.weight))}</span>
+    </span>
+  `).join("");
 }
 
 function sheetHTML(group) {
