@@ -5,6 +5,7 @@ struct HoldingRow: View {
     let owner: Member?
     let ownerName: String
     let isCurrentUser: Bool
+    var showsActions: Bool = true
     var onEdit: (() -> Void)?
     var onDelete: (() -> Void)?
 
@@ -13,6 +14,10 @@ struct HoldingRow: View {
     }
 
     private var canSeeCost: Bool {
+        isCurrentUser || holding.visibility == .full
+    }
+
+    private var canSeeNote: Bool {
         isCurrentUser || holding.visibility == .full
     }
 
@@ -75,14 +80,14 @@ struct HoldingRow: View {
                 }
             }
 
-            if !holding.note.isEmpty {
+            if canSeeNote && !holding.note.isEmpty {
                 Text(holding.note)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
             }
 
-            if isCurrentUser {
+            if isCurrentUser && showsActions {
                 HStack(spacing: 10) {
                     Button(action: { onEdit?() }) {
                         Label("编辑", systemImage: "pencil")
