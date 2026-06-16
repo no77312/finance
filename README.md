@@ -31,7 +31,7 @@ http://127.0.0.1:8787
 
 ## 2. 运行 iOS App
 
-1. 用 Xcode 16 或更新版本打开：
+1. 用 Xcode 打开：
 
    `iOSApp/PositionCircle.xcodeproj`
 
@@ -39,9 +39,19 @@ http://127.0.0.1:8787
 
 3. 点击 Run。
 
-iOS App 默认连接 `http://127.0.0.1:8787`。在 iOS Simulator 中，这个地址会指向本机 Mac。真机调试时需要把 `PositionCircleAPIClient` 里的 `baseURL` 改成 Mac 的局域网 IP。
+iOS App 默认连接 `http://127.0.0.1:8787`。在 iOS Simulator 中，这个地址会指向本机 Mac。真机调试时需要把 `PositionCircleAPIClient` 里的 `baseURL` 改成 Mac 的局域网 IP；部署后则改成 Render 提供的 HTTPS 地址。
 
-当前 Codex 环境只有 Command Line Tools，没有完整 Xcode 和 iOS Simulator，而且 `/Applications` 中没有 `Xcode.app`，所以这里无法启动 App UI。完整 Xcode 通常需要通过 App Store、Apple Developer 下载或企业设备管理安装，不能在这个沙箱里可靠静默安装。我已校验 Xcode 工程文件格式，并跑通后端和 Swift 核心检查。
+## Render 部署
+
+项目根目录已经包含 `render.yaml`。Render Blueprint 会创建：
+
+- Node Web Service：`position-circle-api`
+- Region：`singapore`
+- Plan：`starter`
+- Persistent Disk：`/var/data`，1GB
+- Health Check：`/health`
+
+详细步骤见 [Render 部署指南](docs/DEPLOY_RENDER.md)。
 
 ## 3. 项目检查
 
