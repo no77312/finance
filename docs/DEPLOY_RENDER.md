@@ -116,7 +116,7 @@ OPENAI_MODEL=gpt-4.1-mini
 ALPHA_VANTAGE_API_KEY=你的 Alpha Vantage API Key
 ```
 
-未配置 `ALPHA_VANTAGE_API_KEY` 时，后端会使用原型兜底行情源尝试刷新。现金类持仓不会刷新价格。
+未配置 `ALPHA_VANTAGE_API_KEY` 时，后端不会覆盖已有价格。现金类持仓不会刷新价格。
 
 ## 接入 iOS App
 

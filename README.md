@@ -62,13 +62,13 @@ OPENAI_MODEL=gpt-4.1-mini
 
 ## 收盘价刷新配置
 
-后端会优先使用 Alpha Vantage 官方日线接口；未配置 Key 时，会用原型兜底行情源尝试刷新。
+后端默认使用 Alpha Vantage 官方日线接口；未配置 Key 时，不会覆盖已有价格。
 
 ```text
 ALPHA_VANTAGE_API_KEY=你的 Alpha Vantage API Key
 ```
 
-支持的原型市场：美股、港股、A 股、基金/ETF、主流加密资产。现金类持仓不会刷新价格。
+支持的原型市场：美股、A 股、基金/ETF。现金类持仓不会刷新价格。
 
 ## Render 部署
 

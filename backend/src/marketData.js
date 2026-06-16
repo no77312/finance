@@ -53,16 +53,16 @@ async function fetchPreviousClose(holding) {
     return null;
   }
 
-  const provider = process.env.MARKET_DATA_PROVIDER || (process.env.ALPHA_VANTAGE_API_KEY ? "alpha_vantage" : "yahoo");
+  const provider = process.env.MARKET_DATA_PROVIDER || (process.env.ALPHA_VANTAGE_API_KEY ? "alpha_vantage" : "disabled");
 
-  if (provider === "alpha_vantage") {
+  if (provider === "alpha_vantage" || provider === "alpha_vantage_with_yahoo_fallback") {
     const alphaQuote = await fetchAlphaVantageDailyClose(holding);
     if (alphaQuote) {
       return alphaQuote;
     }
   }
 
-  if (provider !== "alpha_vantage_only") {
+  if (provider === "yahoo" || provider === "alpha_vantage_with_yahoo_fallback") {
     return fetchYahooDailyClose(holding);
   }
 
@@ -95,7 +95,7 @@ async function fetchAlphaVantageDailyClose(holding) {
 
     const latestDate = Object.keys(timeSeries).sort().reverse()[0];
     const close = Number(timeSeries[latestDate]?.["4. close"]);
-    if (!latestDate || !Number.isFinite(close) || close < 0) {
+    if (!latestDate || !Number.isFinite(close) || close <= 0) {
       return null;
     }
 
@@ -127,7 +127,7 @@ async function fetchYahooDailyClose(holding) {
 
     for (let index = timestamps.length - 1; index >= 0; index -= 1) {
       const close = Number(closes[index]);
-      if (!Number.isFinite(close) || close < 0) {
+      if (!Number.isFinite(close) || close <= 0) {
         continue;
       }
 
