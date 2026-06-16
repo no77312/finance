@@ -51,17 +51,21 @@ struct RootView: View {
             .toolbar {
                 if store.selectedGroup != nil {
                     ToolbarItemGroup(placement: .topBarTrailing) {
-                        Button {
-                            editingHolding = nil
-                            isShowingPositionForm = true
+                        Menu {
+                            Button {
+                                editingHolding = nil
+                                isShowingPositionForm = true
+                            } label: {
+                                Label("手工输入", systemImage: "square.and.pencil")
+                            }
+
+                            Button {
+                                isShowingScreenshotImport = true
+                            } label: {
+                                Label("截图导入", systemImage: "camera.viewfinder")
+                            }
                         } label: {
                             Label("提交持仓", systemImage: "plus.circle.fill")
-                        }
-
-                        Button {
-                            isShowingScreenshotImport = true
-                        } label: {
-                            Label("截图导入", systemImage: "camera.viewfinder")
                         }
 
                         Menu {
