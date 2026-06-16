@@ -41,8 +41,31 @@ export class FileStore {
 }
 
 function normalizeStoreData(data) {
+  data.users ??= usersFromGroups(data.groups ?? []);
+  data.sessions ??= [];
   data.groups ??= [];
   data.holdings ??= [];
   data.holdingEvents ??= [];
   return data;
+}
+
+function usersFromGroups(groups) {
+  const usersByID = new Map();
+  for (const group of groups) {
+    for (const member of group.members ?? []) {
+      if (!usersByID.has(member.id)) {
+        usersByID.set(member.id, {
+          id: member.id,
+          provider: "seed",
+          providerUserID: member.id,
+          displayName: member.displayName,
+          email: "",
+          avatarSymbol: member.avatarSymbol,
+          createdAt: member.joinedAt,
+          lastSignedInAt: member.joinedAt
+        });
+      }
+    }
+  }
+  return Array.from(usersByID.values());
 }

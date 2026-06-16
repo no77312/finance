@@ -2,17 +2,20 @@ import Foundation
 
 struct PositionCircleAPIClient {
     var baseURL: URL
-    var currentMemberID: UUID
+    var currentMemberID: UUID?
+    var sessionToken: String?
 
     private let decoder: JSONDecoder
     private let encoder: JSONEncoder
 
     init(
         baseURL: URL = URL(string: "https://position-circle-api.onrender.com")!,
-        currentMemberID: UUID = DemoData.currentMemberID
+        currentMemberID: UUID? = nil,
+        sessionToken: String? = nil
     ) {
         self.baseURL = baseURL
         self.currentMemberID = currentMemberID
+        self.sessionToken = sessionToken
 
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .custom { decoder in
@@ -40,11 +43,49 @@ struct PositionCircleAPIClient {
         try await request(path: "/api/bootstrap")
     }
 
+    func signInWithApple(
+        appleUserID: String,
+        identityToken: String?,
+        email: String?,
+        fullName: String?
+    ) async throws -> BootstrapResponse {
+        try await request(
+            path: "/api/auth/apple",
+            method: "POST",
+            body: AppleSignInRequest(
+                appleUserID: appleUserID,
+                identityToken: identityToken,
+                email: email,
+                fullName: fullName
+            )
+        )
+    }
+
+    func signInWithDevice(deviceID: String, displayName: String) async throws -> BootstrapResponse {
+        try await request(
+            path: "/api/auth/device",
+            method: "POST",
+            body: DeviceSignInRequest(
+                deviceID: deviceID,
+                displayName: displayName
+            )
+        )
+    }
+
     func createGroup(name: String, subtitle: String) async throws -> InvestmentGroup {
         let response: GroupResponse = try await request(
             path: "/api/groups",
             method: "POST",
             body: NewGroupRequest(name: name, subtitle: subtitle)
+        )
+        return response.group
+    }
+
+    func joinGroup(inviteCode: String) async throws -> InvestmentGroup {
+        let response: GroupResponse = try await request(
+            path: "/api/groups/join",
+            method: "POST",
+            body: JoinGroupRequest(inviteCode: inviteCode)
         )
         return response.group
     }
@@ -98,7 +139,12 @@ struct PositionCircleAPIClient {
     ) async throws -> Response {
         var request = URLRequest(url: URL(string: path, relativeTo: baseURL)!)
         request.httpMethod = method
-        request.setValue(currentMemberID.uuidString, forHTTPHeaderField: "X-Member-ID")
+        if let currentMemberID {
+            request.setValue(currentMemberID.uuidString, forHTTPHeaderField: "X-Member-ID")
+        }
+        if let sessionToken {
+            request.setValue(sessionToken, forHTTPHeaderField: "X-Session-Token")
+        }
 
         if let body {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -158,10 +204,29 @@ struct PositionCircleAPIClient {
 }
 
 struct BootstrapResponse: Decodable {
+    var user: AccountUser?
+    var sessionToken: String?
     var currentMemberID: UUID
     var groups: [InvestmentGroup]
     var holdings: [Holding]
     var holdingEvents: [HoldingEvent]?
+}
+
+struct AccountUser: Codable, Identifiable, Hashable {
+    var id: UUID
+    var provider: String
+    var providerUserID: String
+    var displayName: String
+    var email: String?
+    var avatarSymbol: String
+    var createdAt: Date?
+    var lastSignedInAt: Date?
+}
+
+struct AccountSession: Codable, Hashable {
+    var user: AccountUser
+    var currentMemberID: UUID
+    var sessionToken: String
 }
 
 private struct GroupResponse: Decodable {
@@ -189,6 +254,22 @@ private struct ServerErrorResponse: Decodable {
 private struct NewGroupRequest: Encodable {
     var name: String
     var subtitle: String
+}
+
+private struct JoinGroupRequest: Encodable {
+    var inviteCode: String
+}
+
+private struct AppleSignInRequest: Encodable {
+    var appleUserID: String
+    var identityToken: String?
+    var email: String?
+    var fullName: String?
+}
+
+private struct DeviceSignInRequest: Encodable {
+    var deviceID: String
+    var displayName: String
 }
 
 struct ScreenshotImportResponse: Decodable {

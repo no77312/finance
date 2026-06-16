@@ -1,13 +1,18 @@
 import { createServer } from "node:http";
+import { randomUUID } from "node:crypto";
 import {
   badRequest,
   createHoldingEvent,
   exposures,
   findCurrentMember,
   forbidden,
+  memberFromUser,
   memberSummaries,
+  normalizeAppleUser,
+  normalizeDeviceUser,
   normalizeGroupInput,
   normalizeHoldingInput,
+  normalizeInviteCode,
   notFound,
   summariesByCurrency
 } from "./domain.js";
@@ -40,7 +45,11 @@ async function routeRequest(request, response, store) {
 
   if (request.method === "GET" && url.pathname === "/api/bootstrap") {
     const data = await store.read();
-    return send(response, 200, data);
+    const memberID = memberIDForRequest(request);
+    if (memberID) {
+      requireSessionForUser(data, memberID, request);
+    }
+    return send(response, 200, memberID ? bootstrapForMember(data, memberID) : data);
   }
 
   const parts = url.pathname.split("/").filter(Boolean);
@@ -54,8 +63,11 @@ async function routeRequest(request, response, store) {
       endpoints: [
         "GET /health",
         "GET /api/bootstrap",
+        "POST /api/auth/apple",
+        "POST /api/auth/device",
         "GET /api/groups",
         "POST /api/groups",
+        "POST /api/groups/join",
         "GET /api/groups/:groupID",
         "POST /api/imports/parse-screenshot",
         "POST /api/admin/prices/refresh",
@@ -73,6 +85,26 @@ async function routeRequest(request, response, store) {
   if (parts[1] === "imports" && request.method === "POST" && parts.length === 3 && parts[2] === "parse-screenshot") {
     const body = await readJsonBody(request);
     const result = await parseScreenshotImport(body);
+    return send(response, 200, result);
+  }
+
+  if (parts[1] === "auth" && request.method === "POST" && parts.length === 3 && parts[2] === "apple") {
+    const body = await readJsonBody(request);
+    const result = await store.update((data) => {
+      const user = upsertUser(data, "apple", normalizeAppleUser, body);
+      const session = createSession(data, user.id);
+      return bootstrapForMember(data, user.id, user, session.token);
+    });
+    return send(response, 200, result);
+  }
+
+  if (parts[1] === "auth" && request.method === "POST" && parts.length === 3 && parts[2] === "device") {
+    const body = await readJsonBody(request);
+    const result = await store.update((data) => {
+      const user = upsertUser(data, "device", normalizeDeviceUser, body);
+      const session = createSession(data, user.id);
+      return bootstrapForMember(data, user.id, user, session.token);
+    });
     return send(response, 200, result);
   }
 
@@ -98,13 +130,20 @@ async function routeRequest(request, response, store) {
 
   if (request.method === "GET" && parts.length === 2) {
     const data = await store.read();
-    return send(response, 200, { groups: data.groups });
+    const memberID = memberIDForRequest(request);
+    if (memberID) {
+      requireSessionForUser(data, memberID, request);
+    }
+    return send(response, 200, {
+      groups: memberID ? groupsForMember(data, memberID) : data.groups
+    });
   }
 
   if (request.method === "POST" && parts.length === 2) {
     const body = await readJsonBody(request);
-    const memberID = memberIDForRequest(request, body);
+    const memberID = requireMemberID(request, body);
     const group = await store.update((data) => {
+      requireSessionForUser(data, memberID, request);
       const currentMember = findCurrentMember(data, memberID);
       const nextGroup = normalizeGroupInput(body, currentMember);
       data.groups.push(nextGroup);
@@ -113,17 +152,47 @@ async function routeRequest(request, response, store) {
     return send(response, 201, { group });
   }
 
+  if (request.method === "POST" && parts.length === 3 && parts[2] === "join") {
+    const body = await readJsonBody(request);
+    const memberID = requireMemberID(request, body);
+    const group = await store.update((data) => {
+      requireSessionForUser(data, memberID, request);
+      const inviteCode = normalizeInviteCode(body.inviteCode);
+      const nextGroup = data.groups.find((candidate) => normalizeInviteCode(candidate.inviteCode) === inviteCode);
+      if (!nextGroup) {
+        throw notFound("INVITE_CODE_NOT_FOUND", "Invite code not found.");
+      }
+
+      const existingMember = nextGroup.members.find((member) => member.id === memberID);
+      if (!existingMember) {
+        const user = data.users?.find((candidate) => candidate.id === memberID);
+        nextGroup.members.push(memberFromUser(user ?? findCurrentMember(data, memberID), "member"));
+      }
+
+      return nextGroup;
+    });
+    return send(response, 200, { group });
+  }
+
   const groupID = parts[2];
 
   if (request.method === "GET" && parts.length === 3) {
     const data = await store.read();
-    const group = requireGroup(data, groupID);
+    const memberID = memberIDForRequest(request);
+    if (memberID) {
+      requireSessionForUser(data, memberID, request);
+    }
+    const group = requireGroupAccess(data, groupID, memberID);
     return send(response, 200, { group });
   }
 
   if (parts[3] === "analytics" && request.method === "GET" && parts.length === 4) {
     const data = await store.read();
-    const group = requireGroup(data, groupID);
+    const memberID = memberIDForRequest(request);
+    if (memberID) {
+      requireSessionForUser(data, memberID, request);
+    }
+    const group = requireGroupAccess(data, groupID, memberID);
     const holdings = data.holdings.filter((holding) => holding.groupID === groupID);
     return send(response, 200, {
       currencySummaries: summariesByCurrency(holdings),
@@ -136,7 +205,11 @@ async function routeRequest(request, response, store) {
     requirePriceRefreshToken(request);
 
     const result = await store.update(async (data) => {
-      requireGroup(data, groupID);
+      const memberID = memberIDForRequest(request);
+      if (memberID) {
+        requireSessionForUser(data, memberID, request);
+      }
+      requireGroupAccess(data, groupID, memberID);
       const groupHoldings = data.holdings.filter((holding) => holding.groupID === groupID);
       const refreshResult = await refreshHoldingsWithPreviousClose(groupHoldings);
       const refreshedByID = new Map(refreshResult.holdings.map((holding) => [holding.id, holding]));
@@ -149,8 +222,11 @@ async function routeRequest(request, response, store) {
 
   if (parts[3] === "holding-events" && request.method === "GET" && parts.length === 4) {
     const data = await store.read();
-    requireGroup(data, groupID);
     const memberID = memberIDForRequest(request);
+    if (memberID) {
+      requireSessionForUser(data, memberID, request);
+    }
+    requireGroupAccess(data, groupID, memberID);
     const events = data.holdingEvents
       .filter((event) => event.groupID === groupID && (!memberID || event.ownerID === memberID))
       .sort((first, second) => new Date(second.createdAt) - new Date(first.createdAt));
@@ -159,7 +235,11 @@ async function routeRequest(request, response, store) {
 
   if (parts[3] === "holdings" && request.method === "GET" && parts.length === 4) {
     const data = await store.read();
-    requireGroup(data, groupID);
+    const memberID = memberIDForRequest(request);
+    if (memberID) {
+      requireSessionForUser(data, memberID, request);
+    }
+    requireGroupAccess(data, groupID, memberID);
     const holdings = data.holdings
       .filter((holding) => holding.groupID === groupID)
       .sort((first, second) => new Date(second.updatedAt) - new Date(first.updatedAt));
@@ -168,9 +248,10 @@ async function routeRequest(request, response, store) {
 
   if (parts[3] === "holdings" && request.method === "POST" && parts.length === 4) {
     const body = await readJsonBody(request);
-    const memberID = memberIDForRequest(request, body);
+    const memberID = requireMemberID(request, body);
     const result = await store.update((data) => {
-      requireGroup(data, groupID);
+      requireSessionForUser(data, memberID, request);
+      requireGroupAccess(data, groupID, memberID);
       const nextHolding = normalizeHoldingInput(body, groupID, memberID);
       data.holdings.push(nextHolding);
       const event = createHoldingEvent("created", nextHolding);
@@ -186,9 +267,10 @@ async function routeRequest(request, response, store) {
   if (parts[3] === "holdings" && request.method === "PUT" && parts.length === 5) {
     const holdingID = parts[4];
     const body = await readJsonBody(request);
-    const memberID = memberIDForRequest(request, body);
+    const memberID = requireMemberID(request, body);
     const result = await store.update((data) => {
-      requireGroup(data, groupID);
+      requireSessionForUser(data, memberID, request);
+      requireGroupAccess(data, groupID, memberID);
       const index = data.holdings.findIndex((candidate) => candidate.id === holdingID && candidate.groupID === groupID);
       if (index === -1) {
         throw notFound("HOLDING_NOT_FOUND", "Holding not found.");
@@ -211,9 +293,10 @@ async function routeRequest(request, response, store) {
 
   if (parts[3] === "holdings" && request.method === "DELETE" && parts.length === 5) {
     const holdingID = parts[4];
-    const memberID = memberIDForRequest(request);
+    const memberID = requireMemberID(request);
     const event = await store.update((data) => {
-      requireGroup(data, groupID);
+      requireSessionForUser(data, memberID, request);
+      requireGroupAccess(data, groupID, memberID);
       const holding = data.holdings.find((candidate) => candidate.id === holdingID && candidate.groupID === groupID);
       if (!holding) {
         throw notFound("HOLDING_NOT_FOUND", "Holding not found.");
@@ -232,6 +315,71 @@ async function routeRequest(request, response, store) {
   throw notFound("ROUTE_NOT_FOUND", "Route not found.");
 }
 
+function upsertUser(data, provider, normalizer, body) {
+  data.users ??= [];
+  const incomingProviderUserID = body.appleUserID ?? body.deviceID ?? body.providerUserID ?? body.user;
+  const existingIndex = data.users.findIndex((candidate) => (
+    candidate.providerUserID === incomingProviderUserID
+    && candidate.provider === provider
+  ));
+  const user = normalizer(body, existingIndex >= 0 ? data.users[existingIndex] : undefined);
+
+  if (existingIndex >= 0) {
+    data.users[existingIndex] = user;
+  } else {
+    data.users.push(user);
+  }
+
+  updateMemberProfiles(data, user);
+  return user;
+}
+
+function updateMemberProfiles(data, user) {
+  for (const group of data.groups ?? []) {
+    const member = group.members?.find((candidate) => candidate.id === user.id);
+    if (member) {
+      member.displayName = user.displayName;
+      member.avatarSymbol = user.avatarSymbol;
+    }
+  }
+}
+
+function createSession(data, userID) {
+  data.sessions ??= [];
+  const session = {
+    token: `${randomUUID()}${randomUUID()}`.replace(/-/g, ""),
+    userID,
+    createdAt: new Date().toISOString()
+  };
+  data.sessions.push(session);
+  data.sessions = data.sessions.slice(-200);
+  return session;
+}
+
+function bootstrapForMember(data, memberID, knownUser = undefined, sessionToken = undefined) {
+  const groups = groupsForMember(data, memberID);
+  const groupIDs = new Set(groups.map((group) => group.id));
+  const user = knownUser ?? data.users?.find((candidate) => candidate.id === memberID) ?? null;
+
+  const payload = {
+    user,
+    currentMemberID: memberID,
+    groups,
+    holdings: data.holdings.filter((holding) => groupIDs.has(holding.groupID)),
+    holdingEvents: data.holdingEvents.filter((event) => groupIDs.has(event.groupID))
+  };
+
+  if (sessionToken) {
+    payload.sessionToken = sessionToken;
+  }
+
+  return payload;
+}
+
+function groupsForMember(data, memberID) {
+  return data.groups.filter((group) => group.members?.some((member) => member.id === memberID));
+}
+
 function requireGroup(data, groupID) {
   const group = data.groups.find((candidate) => candidate.id === groupID);
   if (!group) {
@@ -240,8 +388,36 @@ function requireGroup(data, groupID) {
   return group;
 }
 
+function requireGroupAccess(data, groupID, memberID) {
+  const group = requireGroup(data, groupID);
+  if (memberID && !group.members?.some((member) => member.id === memberID)) {
+    throw forbidden("GROUP_MEMBER_REQUIRED", "Only group members can access this group.");
+  }
+  return group;
+}
+
 function memberIDForRequest(request, body = {}) {
   return request.headers["x-member-id"] ?? body.ownerID ?? body.memberID ?? body.currentMemberID;
+}
+
+function requireMemberID(request, body = {}) {
+  const memberID = memberIDForRequest(request, body);
+  if (!memberID) {
+    throw forbidden("AUTH_REQUIRED", "Sign in is required.");
+  }
+  return memberID;
+}
+
+function requireSessionForUser(data, memberID, request) {
+  const userSessions = data.sessions?.filter((session) => session.userID === memberID) ?? [];
+  if (userSessions.length === 0) {
+    return;
+  }
+
+  const providedToken = request.headers["x-session-token"];
+  if (!userSessions.some((session) => session.token === providedToken)) {
+    throw forbidden("SESSION_REQUIRED", "Valid session token is required.");
+  }
 }
 
 function requirePriceRefreshToken(request) {
@@ -294,7 +470,7 @@ function send(response, statusCode, body) {
   response.statusCode = statusCode;
   response.setHeader("Access-Control-Allow-Origin", "*");
   response.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-  response.setHeader("Access-Control-Allow-Headers", "Authorization,Content-Type,X-Member-ID,X-Refresh-Token");
+  response.setHeader("Access-Control-Allow-Headers", "Authorization,Content-Type,X-Member-ID,X-Refresh-Token,X-Session-Token");
 
   if (body === undefined) {
     response.end();

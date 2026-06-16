@@ -19,7 +19,9 @@ struct RootView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if let group = store.selectedGroup {
+                if !store.isSignedIn {
+                    SignInView(store: store)
+                } else if let group = store.selectedGroup {
                     VStack(spacing: 0) {
                         GroupHeaderView(
                             group: group,
@@ -47,25 +49,27 @@ struct RootView: View {
                     }
                 }
             }
-            .navigationTitle("持仓圈")
+            .navigationTitle(store.isSignedIn ? "持仓圈" : "")
             .toolbar {
-                if store.selectedGroup != nil {
+                if store.isSignedIn {
                     ToolbarItemGroup(placement: .topBarTrailing) {
-                        Menu {
-                            Button {
-                                editingHolding = nil
-                                isShowingPositionForm = true
-                            } label: {
-                                Label("手工输入", systemImage: "square.and.pencil")
-                            }
+                        if store.selectedGroup != nil {
+                            Menu {
+                                Button {
+                                    editingHolding = nil
+                                    isShowingPositionForm = true
+                                } label: {
+                                    Label("手工输入", systemImage: "square.and.pencil")
+                                }
 
-                            Button {
-                                isShowingScreenshotImport = true
+                                Button {
+                                    isShowingScreenshotImport = true
+                                } label: {
+                                    Label("截图导入", systemImage: "camera.viewfinder")
+                                }
                             } label: {
-                                Label("截图导入", systemImage: "camera.viewfinder")
+                                Label("提交持仓", systemImage: "plus.circle.fill")
                             }
-                        } label: {
-                            Label("提交持仓", systemImage: "plus.circle.fill")
                         }
 
                         Menu {
@@ -81,7 +85,14 @@ struct RootView: View {
                             Button {
                                 isShowingNewGroup = true
                             } label: {
-                                Label("新建群组", systemImage: "person.3.sequence.fill")
+                                Label("新建/加入群组", systemImage: "person.3.sequence.fill")
+                            }
+                            Divider()
+                            Button(role: .destructive) {
+                                store.signOut()
+                                selectedTab = .overview
+                            } label: {
+                                Label("退出登录", systemImage: "rectangle.portrait.and.arrow.right")
                             }
                         } label: {
                             Image(systemName: "person.3.fill")
@@ -115,7 +126,9 @@ struct RootView: View {
                 }
             }
             .task {
-                await store.loadFromBackend()
+                if store.isSignedIn {
+                    await store.loadFromBackend()
+                }
             }
         }
     }
@@ -195,7 +208,7 @@ private struct EmptyGroupsView: View {
             Text("还没有群组")
                 .font(.title3.weight(.semibold))
             Button(action: onCreate) {
-                Label("新建群组", systemImage: "plus")
+                Label("新建或加入群组", systemImage: "plus")
             }
             .buttonStyle(.borderedProminent)
         }

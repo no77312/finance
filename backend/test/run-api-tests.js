@@ -37,6 +37,8 @@ async function main() {
     await servesHealthAndBootstrapData();
     await parsesScreenshotImportDraftsWithoutModelKey();
     await correctsModelPriceCostOrderFromMarketValue();
+    await signsInAndJoinsGroupByInviteCode();
+    await createsGroupForSignedInUser();
     await createsHoldingAndIncludesItInAnalytics();
     await rejectsPriceRefreshWithoutToken();
     await refreshesPricesWithoutBreakingWhenProviderDisabled();
@@ -56,6 +58,59 @@ async function servesHealthAndBootstrapData() {
   assert.equal(bootstrap.groups.length, 1);
   assert.equal(bootstrap.holdings.length, 5);
   assert.equal(Array.isArray(bootstrap.holdingEvents), true);
+}
+
+async function signsInAndJoinsGroupByInviteCode() {
+  const signedIn = await postJsonWithoutMember("/api/auth/apple", {
+    appleUserID: "apple-test-user-1",
+    email: "dana@example.com",
+    fullName: "Dana"
+  });
+
+  assert.equal(signedIn.user.provider, "apple");
+  assert.equal(signedIn.user.displayName, "Dana");
+  assert.ok(signedIn.sessionToken);
+  assert.equal(signedIn.groups.length, 0);
+
+  const rejected = await fetch(`${baseURL}/api/groups/join`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Member-ID": signedIn.currentMemberID
+    },
+    body: JSON.stringify({ inviteCode: "LONG-2026" })
+  });
+  assert.equal(rejected.status, 403);
+
+  const joined = await postJsonWithMember(signedIn.currentMemberID, signedIn.sessionToken, "/api/groups/join", {
+    inviteCode: "long-2026"
+  });
+  assert.equal(joined.group.id, groupID);
+  assert.ok(joined.group.members.some((member) => member.id === signedIn.currentMemberID));
+
+  const bootstrap = await getJsonWithMember(signedIn.currentMemberID, signedIn.sessionToken, "/api/bootstrap");
+  assert.equal(bootstrap.currentMemberID, signedIn.currentMemberID);
+  assert.equal(bootstrap.groups.length, 1);
+  assert.equal(bootstrap.holdings.every((holding) => holding.groupID === groupID), true);
+}
+
+async function createsGroupForSignedInUser() {
+  const signedIn = await postJsonWithoutMember("/api/auth/device", {
+    deviceID: "device-test-user-1",
+    displayName: "Chris"
+  });
+
+  const created = await postJsonWithMember(signedIn.currentMemberID, signedIn.sessionToken, "/api/groups", {
+    name: "新组合",
+    subtitle: "测试创建群组"
+  });
+
+  assert.equal(created.group.members.length, 1);
+  assert.equal(created.group.members[0].id, signedIn.currentMemberID);
+  assert.equal(created.group.members[0].displayName, "Chris");
+
+  const groups = await getJsonWithMember(signedIn.currentMemberID, signedIn.sessionToken, "/api/groups");
+  assert.deepEqual(groups.groups.map((group) => group.id), [created.group.id]);
 }
 
 async function parsesScreenshotImportDraftsWithoutModelKey() {
@@ -236,6 +291,17 @@ async function getJson(path) {
   return response.json();
 }
 
+async function getJsonWithMember(member, sessionToken, path) {
+  const response = await fetch(`${baseURL}${path}`, {
+    headers: {
+      "X-Member-ID": member,
+      "X-Session-Token": sessionToken
+    }
+  });
+  assert.equal(response.ok, true, `${path} returned ${response.status}`);
+  return response.json();
+}
+
 async function postJson(path, body, extraHeaders = {}) {
   const response = await fetch(`${baseURL}${path}`, {
     method: "POST",
@@ -243,6 +309,30 @@ async function postJson(path, body, extraHeaders = {}) {
       "Content-Type": "application/json",
       "X-Member-ID": memberID,
       ...extraHeaders
+    },
+    body: JSON.stringify(body)
+  });
+  assert.equal(response.ok, true, `${path} returned ${response.status}`);
+  return response.json();
+}
+
+async function postJsonWithoutMember(path, body) {
+  const response = await fetch(`${baseURL}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  assert.equal(response.ok, true, `${path} returned ${response.status}`);
+  return response.json();
+}
+
+async function postJsonWithMember(member, sessionToken, path, body) {
+  const response = await fetch(`${baseURL}${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Member-ID": member,
+      "X-Session-Token": sessionToken
     },
     body: JSON.stringify(body)
   });

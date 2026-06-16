@@ -102,6 +102,50 @@ export function normalizeGroupInput(body, currentMember) {
   };
 }
 
+export function normalizeAppleUser(body, existingUser = undefined) {
+  const providerUserID = cleanString(body.appleUserID ?? body.providerUserID ?? body.user);
+  if (!providerUserID) {
+    throw badRequest("APPLE_USER_REQUIRED", "Apple user identifier is required.");
+  }
+
+  return normalizeUser({
+    provider: "apple",
+    providerUserID,
+    displayName: cleanString(body.fullName) || cleanString(body.displayName) || existingUser?.displayName || "Apple 用户",
+    email: cleanString(body.email) || existingUser?.email || "",
+    avatarSymbol: existingUser?.avatarSymbol ?? "person.crop.circle.fill"
+  }, existingUser);
+}
+
+export function normalizeDeviceUser(body, existingUser = undefined) {
+  const providerUserID = cleanString(body.deviceID ?? body.providerUserID);
+  if (!providerUserID) {
+    throw badRequest("DEVICE_ID_REQUIRED", "Device identifier is required.");
+  }
+
+  return normalizeUser({
+    provider: "device",
+    providerUserID,
+    displayName: cleanString(body.displayName) || existingUser?.displayName || "本机用户",
+    email: existingUser?.email || "",
+    avatarSymbol: existingUser?.avatarSymbol ?? "person.crop.circle.fill"
+  }, existingUser);
+}
+
+export function memberFromUser(user, role = "member", existingMember = undefined) {
+  return {
+    id: user.id,
+    displayName: user.displayName,
+    avatarSymbol: user.avatarSymbol,
+    role: existingMember?.role ?? role,
+    joinedAt: existingMember?.joinedAt ?? new Date().toISOString()
+  };
+}
+
+export function normalizeInviteCode(value) {
+  return cleanString(value).toUpperCase();
+}
+
 export function normalizeHoldingInput(body, groupID, ownerID, existingHolding = undefined) {
   const symbol = cleanString(body.symbol).toUpperCase();
   if (!symbol) {
@@ -196,10 +240,16 @@ export function createHoldingEvent(type, holding, previousHolding = undefined) {
 }
 
 export function findCurrentMember(data, memberID) {
+  const resolvedID = memberID || data.currentMemberID || randomUUID().toUpperCase();
+  const user = data.users?.find((candidate) => candidate.id === resolvedID);
+  if (user) {
+    return memberFromUser(user, "owner");
+  }
+
   return data.groups
     .flatMap((group) => group.members)
-    .find((member) => member.id === memberID) ?? {
-    id: memberID,
+    .find((member) => member.id === resolvedID) ?? {
+    id: resolvedID,
     displayName: "我",
     avatarSymbol: "person.crop.circle.fill",
     role: "owner",
@@ -247,6 +297,20 @@ function groupBy(items, keyForItem) {
 
 function cleanString(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeUser(input, existingUser = undefined) {
+  const now = new Date().toISOString();
+  return {
+    id: existingUser?.id ?? randomUUID().toUpperCase(),
+    provider: input.provider,
+    providerUserID: input.providerUserID,
+    displayName: input.displayName,
+    email: input.email,
+    avatarSymbol: input.avatarSymbol,
+    createdAt: existingUser?.createdAt ?? now,
+    lastSignedInAt: now
+  };
 }
 
 function optionalCleanString(body, fieldName, fallback) {
