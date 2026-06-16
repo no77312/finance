@@ -1321,8 +1321,24 @@ button.list-item.active {
   background: #fbfbfd;
 }
 
+.file-drop-title {
+  font-size: 16px;
+  font-weight: 720;
+}
+
 .file-drop input {
   width: 100%;
+}
+
+.import-warning-list {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 20px;
+  background: rgba(255, 159, 10, 0.12);
+  color: #8a5600;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .hidden {

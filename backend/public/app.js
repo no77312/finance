@@ -20,6 +20,7 @@ const state = {
   submitMode: "screenshot",
   editHoldingID: "",
   drafts: [],
+  draftMeta: null,
   message: "",
   error: "",
   busy: false
@@ -81,6 +82,7 @@ function bindEvents() {
       if (value === "submit") {
         state.editHoldingID = "";
         state.drafts = [];
+        state.draftMeta = null;
         state.submitMode = "screenshot";
       }
       render();
@@ -724,8 +726,9 @@ function screenshotImportHTML() {
         </div>
       </div>
       <label class="file-drop">
-        <span class="subtle">选择持仓截图</span>
-        <input name="image" type="file" accept="image/*" required>
+        <span class="file-drop-title">选择持仓截图</span>
+        <span class="subtle">可一次选择多张截图，适合多券商或分页持仓；解析后会合并为一次完整提交。</span>
+        <input name="images" type="file" accept="image/*" multiple required>
       </label>
       <button class="primary-button" type="submit" ${state.busy ? "disabled" : ""}>解析截图</button>
     </form>
@@ -734,20 +737,50 @@ function screenshotImportHTML() {
 }
 
 function draftsHTML() {
-  if (!state.drafts.length) {
+  if (!state.drafts.length && !state.draftMeta) {
     return "";
   }
 
   return `
     <section class="section">
         <div class="section-header">
-          <h3 class="section-title">解析结果</h3>
-          <button class="secondary-button" type="button" data-action="import-drafts" ${state.busy ? "disabled" : ""}>同步本次持仓</button>
+          <div class="section-header-copy">
+            <h3 class="section-title">解析结果</h3>
+            ${draftMetaHTML()}
+          </div>
+          <button class="secondary-button" type="button" data-action="import-drafts" ${state.busy || !state.drafts.length ? "disabled" : ""}>同步本次持仓</button>
         </div>
+        ${draftWarningsHTML()}
         <div class="draft-list">
-          ${state.drafts.map((draft) => holdingDraftHTML(draft)).join("")}
-      </div>
+          ${state.drafts.length ? state.drafts.map((draft) => holdingDraftHTML(draft)).join("") : `<div class="empty">还没有可导入的识别结果。</div>`}
+        </div>
     </section>
+  `;
+}
+
+function draftMetaHTML() {
+  const meta = state.draftMeta;
+  if (!meta) {
+    return "";
+  }
+
+  return `
+    <div class="subtle">
+      已解析 ${meta.fileCount} 张截图，识别 ${meta.rawCount} 条，合并后 ${meta.mergedCount} 条${meta.duplicateCount ? `，覆盖重复 ${meta.duplicateCount} 条` : ""}
+    </div>
+  `;
+}
+
+function draftWarningsHTML() {
+  const warnings = state.draftMeta?.warnings ?? [];
+  if (!warnings.length) {
+    return "";
+  }
+
+  return `
+    <div class="import-warning-list">
+      ${warnings.slice(0, 4).map((warning) => `<div>${escapeHTML(warning)}</div>`).join("")}
+    </div>
   `;
 }
 
@@ -1138,26 +1171,94 @@ async function deleteHolding(holdingID) {
 }
 
 async function parseScreenshot(formData, form) {
-  const file = form.elements.image.files?.[0];
-  if (!file) {
-    setNotice("error", "请选择截图。");
+  const files = Array.from(form.elements.images.files ?? []);
+  if (!files.length) {
+    setNotice("error", "请选择至少一张截图。");
     return;
   }
 
   await runBusy(async () => {
-    const imageDataURL = await imageFileToDataURL(file);
-    const result = await api("/api/imports/parse-screenshot", {
-      method: "POST",
-      body: {
-        imageDataURL,
-        defaultVisibility: formData.get("defaultVisibility"),
-        brokerHint: formData.get("brokerHint"),
-        locale: navigator.language || "zh-Hans"
+    const parsed = [];
+    const warnings = [];
+
+    for (const [index, file] of files.entries()) {
+      const imageDataURL = await imageFileToDataURL(file);
+      const result = await api("/api/imports/parse-screenshot", {
+        method: "POST",
+        body: {
+          imageDataURL,
+          defaultVisibility: formData.get("defaultVisibility"),
+          brokerHint: formData.get("brokerHint"),
+          locale: navigator.language || "zh-Hans"
+        }
+      });
+
+      const holdings = result.holdings ?? [];
+      parsed.push(...holdings.map((draft) => ({
+        ...draft,
+        importSource: file.name || `截图 ${index + 1}`,
+        importIndex: index + 1
+      })));
+
+      for (const warning of result.warnings ?? []) {
+        warnings.push(`第 ${index + 1} 张：${warning}`);
       }
-    });
-    state.drafts = result.holdings ?? [];
-    setNotice("success", result.warnings?.[0] || `识别到 ${state.drafts.length} 条持仓。`);
+    }
+
+    const merged = mergeDrafts(parsed);
+    state.drafts = merged.drafts;
+    state.draftMeta = {
+      fileCount: files.length,
+      rawCount: parsed.length,
+      mergedCount: merged.drafts.length,
+      duplicateCount: merged.duplicateCount,
+      warnings
+    };
+
+    const copy = files.length > 1
+      ? `已解析 ${files.length} 张截图，合并 ${merged.drafts.length} 条持仓。`
+      : `识别到 ${merged.drafts.length} 条持仓。`;
+    setNotice("success", warnings[0] || copy);
   });
+}
+
+function mergeDrafts(drafts) {
+  const bySymbol = new Map();
+  let duplicateCount = 0;
+
+  for (const draft of drafts) {
+    const symbol = normalizeSymbol(draft.symbol);
+    if (!symbol) {
+      continue;
+    }
+
+    if (bySymbol.has(symbol)) {
+      duplicateCount += 1;
+    }
+
+    bySymbol.set(symbol, {
+      ...draft,
+      symbol,
+      note: mergedDraftNote(draft, bySymbol.get(symbol))
+    });
+  }
+
+  return {
+    drafts: Array.from(bySymbol.values()).sort((first, second) => first.symbol.localeCompare(second.symbol)),
+    duplicateCount
+  };
+}
+
+function normalizeSymbol(symbol) {
+  return String(symbol ?? "").trim().toUpperCase();
+}
+
+function mergedDraftNote(nextDraft, previousDraft) {
+  const source = nextDraft.importSource ? `来源：${nextDraft.importSource}` : "";
+  if (!previousDraft) {
+    return nextDraft.note || source;
+  }
+  return nextDraft.note || source || previousDraft.note || "多截图合并";
 }
 
 async function importDrafts() {
@@ -1195,6 +1296,7 @@ async function importDrafts() {
     await refreshBootstrap();
     state.sheet = "";
     state.drafts = [];
+    state.draftMeta = null;
     setNotice("success", `已同步 ${result.summary.snapshotCount} 条持仓，新增 ${result.summary.createdCount}，更新 ${result.summary.updatedCount}，删除 ${result.summary.deletedCount}。`);
   });
 }
@@ -1306,6 +1408,8 @@ function clearSession() {
   state.activeGroupID = "";
   state.selectedMemberID = "";
   state.sheet = "";
+  state.drafts = [];
+  state.draftMeta = null;
 }
 
 function normalizeBootstrap(data) {
@@ -1326,6 +1430,7 @@ function closeSheet() {
   state.sheet = "";
   state.editHoldingID = "";
   state.drafts = [];
+  state.draftMeta = null;
   clearNotice();
   render();
 }
