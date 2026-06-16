@@ -47,8 +47,8 @@ iOS App 默认连接 `http://127.0.0.1:8787`。在 iOS Simulator 中，这个地
 
 - Node Web Service：`position-circle-api`
 - Region：`singapore`
-- Plan：`starter`
-- Persistent Disk：`/var/data`，1GB
+- Plan：`free`
+- Persistent Disk：未启用，免费试跑时数据可能在重启或重新部署后恢复成演示数据
 - Health Check：`/health`
 
 详细步骤见 [Render 部署指南](docs/DEPLOY_RENDER.md)。
