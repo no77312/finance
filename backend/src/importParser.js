@@ -52,13 +52,15 @@ const importSchema = {
 
 export async function parseScreenshotImport({
   ocrText,
+  imageDataURL = "",
   defaultVisibility = "full",
   brokerHint = "",
   locale = "zh-Hans"
 }) {
   const text = cleanText(ocrText);
+  const imageURL = cleanImageDataURL(imageDataURL);
   const visibility = positionVisibilities.has(defaultVisibility) ? defaultVisibility : "full";
-  if (!text) {
+  if (!text && !imageURL) {
     return {
       source: "fallback",
       holdings: [],
@@ -68,7 +70,7 @@ export async function parseScreenshotImport({
 
   if (process.env.OPENAI_API_KEY) {
     try {
-      const parsed = await parseWithOpenAI({ text, visibility, brokerHint, locale });
+      const parsed = await parseWithOpenAI({ text, imageURL, visibility, brokerHint, locale });
       return {
         source: "model",
         holdings: normalizeDrafts(parsed.holdings, visibility),
@@ -86,12 +88,39 @@ export async function parseScreenshotImport({
     }
   }
 
+  if (!text) {
+    return {
+      source: "fallback",
+      holdings: [],
+      warnings: ["截图图片解析需要配置 OPENAI_API_KEY；当前只能解析 OCR 文字。"]
+    };
+  }
+
   return parseWithRules({ text, visibility, hasModelKey: false });
 }
 
-async function parseWithOpenAI({ text, visibility, brokerHint, locale }) {
+async function parseWithOpenAI({ text, imageURL, visibility, brokerHint, locale }) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 25000);
+  const userContent = [
+    {
+      type: "input_text",
+      text: [
+        `默认可见性：${visibility}`,
+        `语言环境：${locale}`,
+        `券商提示：${brokerHint || "未知"}`,
+        text ? "OCR 文本：" : "截图中未提供 OCR 文本，请直接识别图片。",
+        text || ""
+      ].join("\n")
+    }
+  ];
+
+  if (imageURL) {
+    userContent.push({
+      type: "input_image",
+      image_url: imageURL
+    });
+  }
 
   try {
     const response = await fetch(OPENAI_RESPONSES_URL, {
@@ -130,18 +159,7 @@ async function parseWithOpenAI({ text, visibility, brokerHint, locale }) {
           },
           {
             role: "user",
-            content: [
-              {
-                type: "input_text",
-                text: [
-                  `默认可见性：${visibility}`,
-                  `语言环境：${locale}`,
-                  `券商提示：${brokerHint || "未知"}`,
-                  "OCR 文本：",
-                  text
-                ].join("\n")
-              }
-            ]
+            content: userContent
           }
         ],
         text: {
@@ -348,6 +366,19 @@ function extractOutputText(data) {
 
 function cleanText(value) {
   return cleanString(value).slice(0, 12000);
+}
+
+function cleanImageDataURL(value) {
+  const dataURL = cleanString(value);
+  if (!dataURL) {
+    return "";
+  }
+
+  if (!/^data:image\/(?:png|jpeg|jpg|webp);base64,[A-Za-z0-9+/=]+$/i.test(dataURL)) {
+    return "";
+  }
+
+  return dataURL.slice(0, 6 * 1024 * 1024);
 }
 
 function cleanString(value) {

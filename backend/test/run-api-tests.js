@@ -28,7 +28,18 @@ async function main() {
     dataFile: join(tempDir, "store.json"),
     seedFile
   });
-  const server = createPositionCircleServer({ store });
+  const server = createPositionCircleServer({
+    store,
+    verifyGoogleIDToken: async (body) => {
+      assert.equal(body.credential, "fake-google-token");
+      return {
+        googleUserID: "google-test-user-1",
+        email: "gina@example.com",
+        fullName: "Gina",
+        pictureURL: "https://example.com/gina.png"
+      };
+    }
+  });
 
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   baseURL = `http://127.0.0.1:${server.address().port}`;
@@ -38,6 +49,7 @@ async function main() {
     await parsesScreenshotImportDraftsWithoutModelKey();
     await correctsModelPriceCostOrderFromMarketValue();
     await signsInAndJoinsGroupByInviteCode();
+    await signsInWithGoogleAndCreatesGroup();
     await createsGroupForSignedInUser();
     await createsHoldingAndIncludesItInAnalytics();
     await rejectsPriceRefreshWithoutToken();
@@ -92,6 +104,27 @@ async function signsInAndJoinsGroupByInviteCode() {
   assert.equal(bootstrap.currentMemberID, signedIn.currentMemberID);
   assert.equal(bootstrap.groups.length, 1);
   assert.equal(bootstrap.holdings.every((holding) => holding.groupID === groupID), true);
+}
+
+async function signsInWithGoogleAndCreatesGroup() {
+  const signedIn = await postJsonWithoutMember("/api/auth/google", {
+    credential: "fake-google-token"
+  });
+
+  assert.equal(signedIn.user.provider, "google");
+  assert.equal(signedIn.user.displayName, "Gina");
+  assert.equal(signedIn.user.email, "gina@example.com");
+  assert.equal(signedIn.user.pictureURL, "https://example.com/gina.png");
+  assert.ok(signedIn.sessionToken);
+
+  const created = await postJsonWithMember(signedIn.currentMemberID, signedIn.sessionToken, "/api/groups", {
+    name: "Google 登录小组",
+    subtitle: "PWA 测试"
+  });
+
+  assert.equal(created.group.members[0].id, signedIn.currentMemberID);
+  assert.equal(created.group.members[0].displayName, "Gina");
+  assert.equal(created.group.members[0].pictureURL, "https://example.com/gina.png");
 }
 
 async function createsGroupForSignedInUser() {

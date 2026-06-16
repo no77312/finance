@@ -132,11 +132,28 @@ export function normalizeDeviceUser(body, existingUser = undefined) {
   }, existingUser);
 }
 
+export function normalizeGoogleUser(body, existingUser = undefined) {
+  const providerUserID = cleanString(body.googleUserID ?? body.providerUserID ?? body.sub);
+  if (!providerUserID) {
+    throw badRequest("GOOGLE_USER_REQUIRED", "Google user identifier is required.");
+  }
+
+  return normalizeUser({
+    provider: "google",
+    providerUserID,
+    displayName: cleanString(body.fullName) || cleanString(body.displayName) || cleanString(body.name) || existingUser?.displayName || "Google 用户",
+    email: cleanString(body.email) || existingUser?.email || "",
+    avatarSymbol: existingUser?.avatarSymbol ?? "person.crop.circle.fill",
+    pictureURL: cleanString(body.pictureURL) || cleanString(body.picture) || existingUser?.pictureURL || ""
+  }, existingUser);
+}
+
 export function memberFromUser(user, role = "member", existingMember = undefined) {
   return {
     id: user.id,
     displayName: user.displayName,
     avatarSymbol: user.avatarSymbol,
+    pictureURL: user.pictureURL ?? existingMember?.pictureURL ?? "",
     role: existingMember?.role ?? role,
     joinedAt: existingMember?.joinedAt ?? new Date().toISOString()
   };
@@ -308,6 +325,7 @@ function normalizeUser(input, existingUser = undefined) {
     displayName: input.displayName,
     email: input.email,
     avatarSymbol: input.avatarSymbol,
+    pictureURL: input.pictureURL ?? existingUser?.pictureURL ?? "",
     createdAt: existingUser?.createdAt ?? now,
     lastSignedInAt: now
   };

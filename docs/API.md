@@ -24,13 +24,14 @@ npm test
 
 ## 通用 Header
 
-原型阶段使用 `X-Member-ID` 表示当前用户：
+登录成功后，客户端保存后端返回的 `currentMemberID` 和 `sessionToken`。后续请求带：
 
 ```text
 X-Member-ID: 4D99EF67-4E8F-4BA6-9E96-1E62E7680010
+X-Session-Token: 你的 sessionToken
 ```
 
-生产版本必须替换为登录态和服务端鉴权，不能信任客户端传入的 member id。
+iOS 当前支持 Apple / 本机账号，PWA 支持 Google 登录。受保护路由会校验用户 session。
 
 ## Endpoints
 
@@ -38,9 +39,42 @@ X-Member-ID: 4D99EF67-4E8F-4BA6-9E96-1E62E7680010
 
 健康检查。
 
+### GET /api/config
+
+返回 PWA 需要的公开配置。
+
+```json
+{
+  "googleClientID": "xxxx.apps.googleusercontent.com"
+}
+```
+
 ### GET /api/bootstrap
 
 返回 iOS 启动所需的群组、持仓、持仓变动事件和当前成员 ID。
+
+### POST /api/auth/google
+
+PWA Google 登录。前端通过 Google Identity Services 拿到 ID token 后，把 `credential` 发给后端；后端用 `google-auth-library` 校验签名、`aud`、`iss` 和过期时间，并使用 Google `sub` 作为用户唯一标识。
+
+```json
+{
+  "credential": "Google ID token"
+}
+```
+
+返回：
+
+```json
+{
+  "user": {},
+  "currentMemberID": "...",
+  "sessionToken": "...",
+  "groups": [],
+  "holdings": [],
+  "holdingEvents": []
+}
+```
 
 ### GET /api/groups
 
@@ -54,6 +88,16 @@ X-Member-ID: 4D99EF67-4E8F-4BA6-9E96-1E62E7680010
 {
   "name": "家庭资产小组",
   "subtitle": "每周同步一次"
+}
+```
+
+### POST /api/groups/join
+
+通过邀请码加入群组。
+
+```json
+{
+  "inviteCode": "LONG-2026"
 }
 ```
 
@@ -94,6 +138,19 @@ X-Member-ID: 4D99EF67-4E8F-4BA6-9E96-1E62E7680010
 ### DELETE /api/groups/:groupID/holdings/:holdingID
 
 删除自己的持仓，并返回一条 `deleted` 事件。
+
+### POST /api/imports/parse-screenshot
+
+截图导入解析。iOS 可传 OCR 文本；PWA 可传压缩后的 `imageDataURL`，后端会用 OpenAI 视觉能力解析图片。
+
+```json
+{
+  "ocrText": "可选 OCR 文本",
+  "imageDataURL": "data:image/jpeg;base64,...",
+  "defaultVisibility": "amountOnly",
+  "brokerHint": "富途"
+}
+```
 
 ### POST /api/admin/prices/refresh
 

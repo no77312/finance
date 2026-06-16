@@ -5,6 +5,7 @@
 ## 已完成内容
 
 - SwiftUI iOS 原型：群组首页、总览、我的持仓、成员列表、提交/编辑/删除持仓、截图导入、新建群组。
+- PWA 网页版：同一个 Render 服务直接托管移动端网页，可添加到手机主屏幕，支持 Google 登录、群组、成员持仓和提交持仓。
 - Node 后端：本地 API、文件持久化、群组/持仓 CRUD、聚合分析接口。
 - iOS 网络层：启动拉取后端数据，保存/删除同步后端，后端不可用时回退到演示数据。
 - 截图导入：iOS 本地 OCR 识别截图文字，后端可用 OpenAI 大模型解析成持仓草稿，确认后写入。
@@ -21,6 +22,7 @@
 
 ```bash
 cd backend
+npm install
 npm start
 ```
 
@@ -31,6 +33,29 @@ http://127.0.0.1:8787
 ```
 
 首次启动会从 `backend/data/seed.json` 生成 `backend/data/store.json`，之后新增和编辑的数据会写入 `store.json`。
+
+## PWA 网页版
+
+后端会同时托管 PWA 静态页面，部署后直接访问 Render 公网地址即可：
+
+```text
+https://position-circle-api.onrender.com
+```
+
+Google 登录需要在 Render 环境变量里配置：
+
+```text
+GOOGLE_CLIENT_ID=你的 Web application OAuth Client ID
+```
+
+创建 Google OAuth Client 时，Authorized JavaScript origins 至少加入：
+
+```text
+https://position-circle-api.onrender.com
+http://localhost:8787
+```
+
+详细步骤见 [PWA Google 登录配置](docs/PWA_GOOGLE.md)。
 
 ## 2. 运行 iOS App
 
@@ -117,6 +142,7 @@ PositionCircle/
 ├── backend/
 │   ├── src/
 │   ├── data/
+│   ├── public/
 │   └── test/
 ├── Package.swift
 ├── Sources/

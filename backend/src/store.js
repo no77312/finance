@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 export class FileStore {
@@ -27,7 +27,7 @@ export class FileStore {
     this.writeChain = this.writeChain.then(async () => {
       const tempFile = `${this.dataFile}.tmp`;
       await writeFile(tempFile, `${JSON.stringify(data, null, 2)}\n`);
-      await writeFile(this.dataFile, `${JSON.stringify(data, null, 2)}\n`);
+      await rename(tempFile, this.dataFile);
     });
     await this.writeChain;
   }

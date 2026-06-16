@@ -1,5 +1,10 @@
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
+import { createReadStream } from "node:fs";
+import { stat } from "node:fs/promises";
+import { dirname, extname, join, normalize, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { OAuth2Client } from "google-auth-library";
 import {
   badRequest,
   createHoldingEvent,
@@ -10,6 +15,7 @@ import {
   memberSummaries,
   normalizeAppleUser,
   normalizeDeviceUser,
+  normalizeGoogleUser,
   normalizeGroupInput,
   normalizeHoldingInput,
   normalizeInviteCode,
@@ -19,17 +25,20 @@ import {
 import { parseScreenshotImport } from "./importParser.js";
 import { refreshHoldingsWithPreviousClose } from "./marketData.js";
 
-export function createPositionCircleServer({ store }) {
+const moduleDir = dirname(fileURLToPath(import.meta.url));
+const defaultPublicDir = resolve(moduleDir, "..", "public");
+
+export function createPositionCircleServer({ store, publicDir = defaultPublicDir, verifyGoogleIDToken = verifyGoogleCredential }) {
   return createServer(async (request, response) => {
     try {
-      await routeRequest(request, response, store);
+      await routeRequest(request, response, store, { publicDir, verifyGoogleIDToken });
     } catch (error) {
       sendError(response, error);
     }
   });
 }
 
-async function routeRequest(request, response, store) {
+async function routeRequest(request, response, store, context) {
   const url = new URL(request.url, `http://${request.headers.host ?? "localhost"}`);
 
   if (request.method === "OPTIONS") {
@@ -40,6 +49,12 @@ async function routeRequest(request, response, store) {
     return send(response, 200, {
       status: "ok",
       service: "position-circle-api"
+    });
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/config") {
+    return send(response, 200, {
+      googleClientID: process.env.GOOGLE_CLIENT_ID ?? ""
     });
   }
 
@@ -54,7 +69,7 @@ async function routeRequest(request, response, store) {
 
   const parts = url.pathname.split("/").filter(Boolean);
   if (parts[0] !== "api") {
-    throw notFound("ROUTE_NOT_FOUND", "Route not found.");
+    return serveStaticAsset(url.pathname, response, context.publicDir);
   }
 
   if (parts.length === 1) {
@@ -62,9 +77,11 @@ async function routeRequest(request, response, store) {
       name: "PositionCircle API",
       endpoints: [
         "GET /health",
+        "GET /api/config",
         "GET /api/bootstrap",
         "POST /api/auth/apple",
         "POST /api/auth/device",
+        "POST /api/auth/google",
         "GET /api/groups",
         "POST /api/groups",
         "POST /api/groups/join",
@@ -80,6 +97,17 @@ async function routeRequest(request, response, store) {
         "GET /api/groups/:groupID/analytics"
       ]
     });
+  }
+
+  if (parts[1] === "auth" && request.method === "POST" && parts.length === 3 && parts[2] === "google") {
+    const body = await readJsonBody(request);
+    const verifiedUser = await context.verifyGoogleIDToken(body);
+    const result = await store.update((data) => {
+      const user = upsertUser(data, "google", normalizeGoogleUser, verifiedUser);
+      const session = createSession(data, user.id);
+      return bootstrapForMember(data, user.id, user, session.token);
+    });
+    return send(response, 200, result);
   }
 
   if (parts[1] === "imports" && request.method === "POST" && parts.length === 3 && parts[2] === "parse-screenshot") {
@@ -317,7 +345,7 @@ async function routeRequest(request, response, store) {
 
 function upsertUser(data, provider, normalizer, body) {
   data.users ??= [];
-  const incomingProviderUserID = body.appleUserID ?? body.deviceID ?? body.providerUserID ?? body.user;
+  const incomingProviderUserID = body.appleUserID ?? body.deviceID ?? body.googleUserID ?? body.providerUserID ?? body.user ?? body.sub;
   const existingIndex = data.users.findIndex((candidate) => (
     candidate.providerUserID === incomingProviderUserID
     && candidate.provider === provider
@@ -340,6 +368,7 @@ function updateMemberProfiles(data, user) {
     if (member) {
       member.displayName = user.displayName;
       member.avatarSymbol = user.avatarSymbol;
+      member.pictureURL = user.pictureURL ?? "";
     }
   }
 }
@@ -432,6 +461,45 @@ function requirePriceRefreshToken(request) {
   }
 }
 
+async function verifyGoogleCredential(body) {
+  const credential = cleanString(body.credential ?? body.idToken ?? body.token);
+  if (!credential) {
+    throw badRequest("GOOGLE_CREDENTIAL_REQUIRED", "Google credential is required.");
+  }
+
+  const clientID = process.env.GOOGLE_CLIENT_ID;
+  if (!clientID) {
+    throw forbidden("GOOGLE_CLIENT_ID_REQUIRED", "Set GOOGLE_CLIENT_ID to enable Google sign-in.");
+  }
+
+  let payload;
+  try {
+    const client = new OAuth2Client(clientID);
+    const ticket = await client.verifyIdToken({
+      idToken: credential,
+      audience: clientID
+    });
+    payload = ticket.getPayload();
+  } catch {
+    throw forbidden("GOOGLE_CREDENTIAL_INVALID", "Google credential is invalid.");
+  }
+
+  if (!payload?.sub) {
+    throw badRequest("GOOGLE_USER_REQUIRED", "Google user identifier is required.");
+  }
+
+  if (payload.email_verified === false) {
+    throw forbidden("GOOGLE_EMAIL_UNVERIFIED", "Google email is not verified.");
+  }
+
+  return {
+    googleUserID: payload.sub,
+    email: payload.email ?? "",
+    fullName: payload.name ?? payload.email ?? "Google 用户",
+    pictureURL: payload.picture ?? ""
+  };
+}
+
 function bearerToken(value) {
   if (typeof value !== "string") {
     return undefined;
@@ -446,11 +514,100 @@ function appendHoldingEvent(data, event) {
   data.holdingEvents = data.holdingEvents.slice(-500);
 }
 
+async function serveStaticAsset(pathname, response, publicDir) {
+  const publicRoot = resolve(publicDir);
+  const decodedPath = safeDecodePath(pathname);
+  const assetPath = decodedPath === "/" ? "index.html" : normalize(decodedPath).replace(/^[/\\]+/, "");
+  const requestedFile = resolve(publicRoot, assetPath);
+
+  if (!isPathInside(publicRoot, requestedFile)) {
+    throw forbidden("STATIC_ASSET_FORBIDDEN", "Static asset path is not allowed.");
+  }
+
+  const filePath = await existingStaticFile(requestedFile, publicRoot, extname(assetPath) === "");
+  if (!filePath) {
+    throw notFound("STATIC_ASSET_NOT_FOUND", "Static asset not found.");
+  }
+
+  response.statusCode = 200;
+  response.setHeader("Content-Type", contentTypeForPath(filePath));
+  response.setHeader("Cache-Control", cacheControlForPath(filePath));
+
+  await new Promise((resolveStream, rejectStream) => {
+    const stream = createReadStream(filePath);
+    stream.on("error", rejectStream);
+    stream.on("end", resolveStream);
+    stream.pipe(response);
+  });
+}
+
+async function existingStaticFile(requestedFile, publicRoot, shouldFallbackToIndex) {
+  const directFile = await statFile(requestedFile);
+  if (directFile) {
+    return directFile;
+  }
+
+  if (!shouldFallbackToIndex) {
+    return null;
+  }
+
+  const indexFile = join(publicRoot, "index.html");
+  return statFile(indexFile);
+}
+
+async function statFile(filePath) {
+  try {
+    const stats = await stat(filePath);
+    return stats.isFile() ? filePath : null;
+  } catch {
+    return null;
+  }
+}
+
+function safeDecodePath(pathname) {
+  try {
+    return decodeURIComponent(pathname);
+  } catch {
+    throw badRequest("INVALID_PATH", "Request path is invalid.");
+  }
+}
+
+function isPathInside(parent, child) {
+  const normalizedParent = parent.endsWith("/") ? parent : `${parent}/`;
+  return child === parent || child.startsWith(normalizedParent);
+}
+
+function contentTypeForPath(filePath) {
+  switch (extname(filePath).toLowerCase()) {
+  case ".css":
+    return "text/css; charset=utf-8";
+  case ".js":
+    return "text/javascript; charset=utf-8";
+  case ".json":
+  case ".webmanifest":
+    return "application/manifest+json; charset=utf-8";
+  case ".svg":
+    return "image/svg+xml; charset=utf-8";
+  case ".png":
+    return "image/png";
+  case ".html":
+    return "text/html; charset=utf-8";
+  default:
+    return "application/octet-stream";
+  }
+}
+
+function cacheControlForPath(filePath) {
+  return /\/(?:app|styles|sw)\.js$|\.css$|\.html$/.test(filePath)
+    ? "no-cache"
+    : "public, max-age=31536000, immutable";
+}
+
 async function readJsonBody(request) {
   let raw = "";
   for await (const chunk of request) {
     raw += chunk;
-    if (raw.length > 1024 * 1024) {
+    if (raw.length > 7 * 1024 * 1024) {
       throw badRequest("BODY_TOO_LARGE", "Request body is too large.");
     }
   }
@@ -464,6 +621,10 @@ async function readJsonBody(request) {
   } catch {
     throw badRequest("INVALID_JSON", "Request body must be valid JSON.");
   }
+}
+
+function cleanString(value) {
+  return typeof value === "string" ? value.trim() : "";
 }
 
 function send(response, statusCode, body) {

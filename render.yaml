@@ -18,6 +18,8 @@ services:
         sync: false
       - key: OPENAI_MODEL
         value: gpt-4.1-mini
+      - key: GOOGLE_CLIENT_ID
+        sync: false
       - key: ALPHA_VANTAGE_API_KEY
         sync: false
       - key: PRICE_REFRESH_TOKEN
