@@ -252,12 +252,21 @@ async function parsesImageModelDraftWithoutAverageCost() {
           completions: [
             {
               id: 0,
-              symbol: "01585",
+              symbol: "1585",
               assetName: "雅迪控股",
               market: "hkStock",
               currency: "HKD",
               confidence: 0.95,
               note: "已联网补全港股代码"
+            },
+            {
+              id: 1,
+              symbol: "000832",
+              assetName: "新产业",
+              market: "cnStock",
+              currency: "CNY",
+              confidence: 0.95,
+              note: "模拟搜索错配，后端应使用已知简称校正"
             }
           ],
           warnings: []
@@ -287,6 +296,23 @@ async function parsesImageModelDraftWithoutAverageCost() {
             confidence: 0.9,
             note: "截图未展示股票代码",
             rawText: "雅迪控股 18,550.20\n成本/现价\nHK$11.641 / HK$10.750"
+          },
+          {
+            symbol: "新产业",
+            assetName: "新产业",
+            market: "cnStock",
+            quantity: null,
+            averageCost: null,
+            lastPrice: null,
+            marketValue: null,
+            currency: "CNY",
+            visibility: "amountOnly",
+            brokerName: "华宝证券",
+            accountName: "**1473",
+            accountKey: "华宝证券:**1473",
+            confidence: 0.9,
+            note: "截图未展示股票代码",
+            rawText: "新产业 4,271.00\n成本/现价\n44.486 / 42.710"
           }
         ],
         warnings: ["缺少数量、成本价、现价和市值，需人工确认。"]
@@ -311,10 +337,14 @@ async function parsesImageModelDraftWithoutAverageCost() {
     assert.ok(requestBodies[1].tools.some((tool) => tool.type === "web_search"));
     assert.equal(requestBodies[1].tool_choice, "required");
     assert.equal(parsed.source, "model");
-    assert.equal(parsed.holdings[0].symbol, "01585");
+    assert.equal(parsed.holdings[0].symbol, "1585");
     assert.equal(parsed.holdings[0].quantity, 1725.6);
     assert.equal(parsed.holdings[0].averageCost, 11.641);
     assert.equal(parsed.holdings[0].lastPrice, 10.75);
+    assert.equal(parsed.holdings[1].symbol, "300832");
+    assert.equal(parsed.holdings[1].quantity, 100);
+    assert.equal(parsed.holdings[1].averageCost, 44.486);
+    assert.equal(parsed.holdings[1].lastPrice, 42.71);
     assert.ok(!parsed.warnings.some((warning) => warning.includes("缺少数量")));
   } finally {
     globalThis.fetch = previousFetch;

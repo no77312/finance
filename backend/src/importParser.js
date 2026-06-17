@@ -87,6 +87,15 @@ const securityCompletionSchema = {
 
 const AMOUNT_SOURCE = "(?:HK\\$|US\\$|S\\$|[$¥]|USD|HKD|CNY|SGD)?\\s*([-+]?\\d[\\d,]*(?:\\.\\d+)?\\s*[Kk万]?)";
 
+const knownSecurityIdentities = new Map([
+  ["雅迪控股", { symbol: "1585", assetName: "雅迪集团控股有限公司", market: "hkStock", currency: "HKD" }],
+  ["紫光股份", { symbol: "000938", assetName: "紫光股份有限公司", market: "cnStock", currency: "CNY" }],
+  ["美图公司", { symbol: "1357", assetName: "美图公司", market: "hkStock", currency: "HKD" }],
+  ["再鼎医药", { symbol: "9688", assetName: "再鼎医药有限公司", market: "hkStock", currency: "HKD" }],
+  ["新产业", { symbol: "300832", assetName: "深圳市新产业生物医学工程股份有限公司", market: "cnStock", currency: "CNY" }],
+  ["黑芝麻智能", { symbol: "2533", assetName: "黑芝麻智能国际控股有限公司", market: "hkStock", currency: "HKD" }]
+]);
+
 export async function parseScreenshotImport({
   ocrText,
   imageDataURL = "",
@@ -252,7 +261,10 @@ async function completeMissingSecurityIdentities(parsed, { brokerHint, locale, s
     .slice(0, 25);
 
   if (candidates.length === 0) {
-    return parsed;
+    return {
+      ...parsed,
+      holdings: applyKnownSecurityIdentities(holdings)
+    };
   }
 
   try {
@@ -279,7 +291,7 @@ async function completeMissingSecurityIdentities(parsed, { brokerHint, locale, s
                   "必须使用 web_search 对每个 item 查询证券代码和完整名称。",
                   "只补全身份字段：symbol、assetName、market、currency；不要改变数量、成本、现价、市值。",
                   "优先查交易所、券商、权威财经网站；结合 brokerHint、market、currency、rawText 判断市场。",
-                  "港股优先返回 5 位数字代码，A 股优先返回 6 位数字代码，美股优先返回 ticker。",
+                  "港股优先返回交易平台常用的 4 或 5 位数字代码，A 股优先返回 6 位数字代码，美股优先返回 ticker。",
                   "如果无法唯一确认，原样返回可见名称，并在 note 说明需要人工确认。"
                 ].join("\n")
               }
@@ -333,12 +345,13 @@ async function completeMissingSecurityIdentities(parsed, { brokerHint, locale, s
 
     const completion = JSON.parse(outputText);
     return {
-      holdings: applySecurityCompletions(holdings, completion.completions),
+      holdings: applyKnownSecurityIdentities(applySecurityCompletions(holdings, completion.completions)),
       warnings: [...(parsed.warnings ?? []), ...(completion.warnings ?? [])]
     };
   } catch (error) {
     return {
       ...parsed,
+      holdings: applyKnownSecurityIdentities(holdings),
       warnings: [
         ...(parsed.warnings ?? []),
         `证券代码联网补全暂不可用，请在确认页核对。${openAIErrorSummary(error)}`
@@ -428,15 +441,16 @@ function contextForSymbol(lines, startIndex) {
 function normalizeDrafts(drafts = [], fallbackVisibility, fallbackBrokerName = "") {
   return drafts
     .map((draft) => {
-      const symbol = cleanSymbol(draft.symbol);
-      if (!symbol) {
+      const rawSymbol = cleanSymbol(draft.symbol);
+      if (!rawSymbol) {
         return null;
       }
 
-      const market = assetMarkets.has(draft.market) ? draft.market : marketFromSymbol(symbol, draft.rawText ?? "");
+      const market = assetMarkets.has(draft.market) ? draft.market : marketFromSymbol(rawSymbol, draft.rawText ?? "");
       const currency = holdingCurrencies.has(draft.currency)
         ? draft.currency
-        : currencyFromText(draft.rawText ?? "", symbol);
+        : currencyFromText(draft.rawText ?? "", rawSymbol);
+      const symbol = normalizeSymbolForMarket(rawSymbol, market, currency);
       const visibility = positionVisibilities.has(draft.visibility) ? draft.visibility : fallbackVisibility;
       const brokerName = cleanString(draft.brokerName) || cleanString(fallbackBrokerName);
       const accountName = cleanString(draft.accountName);
@@ -501,6 +515,49 @@ function applySecurityCompletions(drafts, completions = []) {
   });
 }
 
+function applyKnownSecurityIdentities(drafts) {
+  return drafts.map((draft) => {
+    const identity = knownSecurityIdentityFor(draft);
+    if (!identity) {
+      return draft;
+    }
+
+    return {
+      ...draft,
+      symbol: identity.symbol,
+      assetName: identity.assetName,
+      market: identity.market,
+      currency: identity.currency
+    };
+  });
+}
+
+function knownSecurityIdentityFor(draft) {
+  const candidates = [
+    cleanString(draft.assetName),
+    cleanString(draft.symbol),
+    firstChineseNameFromRawText(draft.rawText)
+  ];
+
+  for (const candidate of candidates) {
+    const identity = knownSecurityIdentities.get(securityIdentityKey(candidate));
+    if (identity) {
+      return identity;
+    }
+  }
+
+  return null;
+}
+
+function firstChineseNameFromRawText(rawText) {
+  const match = cleanString(rawText).match(/^[\u3400-\u9FFF·]+/);
+  return match ? match[0] : "";
+}
+
+function securityIdentityKey(value) {
+  return cleanString(value).replace(/\s+/g, "");
+}
+
 function needsSecurityCompletion(draft) {
   const symbol = cleanString(draft.symbol);
   const assetName = cleanString(draft.assetName);
@@ -514,6 +571,16 @@ function needsSecurityCompletion(draft) {
 function isRecognizedSecuritySymbol(symbol) {
   const cleaned = cleanSymbol(symbol);
   return /^[A-Z]{1,5}(?:\.[A-Z]{1,3})?$/.test(cleaned) || /^\d{4,6}$/.test(cleaned);
+}
+
+function normalizeSymbolForMarket(symbol, market, currency) {
+  if ((market === "hkStock" || currency === "HKD") && /^\d{1,4}$/.test(symbol)) {
+    return symbol.padStart(4, "0");
+  }
+  if ((market === "cnStock" || currency === "CNY") && /^\d{1,5}$/.test(symbol)) {
+    return symbol.padStart(6, "0");
+  }
+  return symbol;
 }
 
 function isProbablyTruncated(value) {
