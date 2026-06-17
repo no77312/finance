@@ -31,7 +31,7 @@
 
 html,
 body {
-  min-height: 100%;
+  height: 100%;
 }
 
 html {
@@ -46,6 +46,7 @@ body {
   color: var(--ink);
   font-size: 16px;
   letter-spacing: 0;
+  overflow: hidden;
 }
 
 button,
@@ -60,8 +61,14 @@ button {
 }
 
 .app-shell {
-  min-height: 100vh;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
   padding: max(20px, env(safe-area-inset-top)) 18px calc(96px + env(safe-area-inset-bottom));
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .boot,
@@ -993,8 +1000,9 @@ button.list-item.active {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
-  background: rgba(255, 255, 255, 0.96);
+  background: #ffffff;
   border-top: 0.5px solid rgba(60, 60, 67, 0.14);
+  box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.06);
 }
 
 .tabbar button {
