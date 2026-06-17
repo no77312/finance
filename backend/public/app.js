@@ -278,40 +278,15 @@ function mainContentHTML(group) {
 
 function overviewHTML(group) {
   const holdings = groupHoldings(group.id);
-  const summary = visibleSummary(holdings);
-  const visibleHoldingCount = holdings.filter((holding) => canSeeValues(holding)).length;
-  const contributingCount = new Set(holdings.map((holding) => holding.ownerID)).size;
-  const exposures = exposureRows(holdings)
-    .filter((exposure) => exposure.holderCount > 1)
-    .slice(0, 8);
+  const consensusExposures = exposureRows(holdings)
+    .filter((exposure) => exposure.holderCount > 1);
+  const exposures = consensusExposures.slice(0, 8);
   const snapshots = recentSnapshotSummaries(group.id).slice(0, 6);
-  const latestSnapshotAt = groupLatestSnapshotAt(group.id);
 
   return `
     <main class="content overview-layout">
       <section class="section">
-        <div class="panel group-overview-panel">
-          <div class="overview-heading">
-            <div>
-              <div class="topbar-label">群组概况</div>
-              <h2 class="section-title">${escapeHTML(group.name)}</h2>
-              <div class="subtle">${escapeHTML(group.subtitle || "共享持仓与观点")}</div>
-            </div>
-            ${group.inviteCode
-              ? `<button class="pill blue pill-button invite-button" type="button" data-action="copy-invite" data-value="${escapeAttr(group.inviteCode)}">复制邀请码 <strong>${escapeHTML(group.inviteCode)}</strong></button>`
-              : ""}
-          </div>
-          <div class="metric-grid grid">
-            ${metricHTML("可见市值", money(summary.marketValue, "USD"))}
-            ${metricHTML("已提交成员", String(contributingCount))}
-            ${metricHTML("公开持仓", String(visibleHoldingCount))}
-            ${metricHTML("共识标的", String(exposures.length))}
-          </div>
-          <div class="portfolio-note group-overview-note">
-            <span>${latestSnapshotAt ? `最近提交 ${formatDateTime(latestSnapshotAt)}` : "还没有成员提交持仓。"}</span>
-            <span>${group.members?.length ?? 0} 位成员，金额统一折算为 USD</span>
-          </div>
-        </div>
+        ${overviewDashboardHTML(group, holdings, consensusExposures)}
         <div class="section-header">
           <div class="section-header-copy">
             <h2 class="section-title">共识标的</h2>
@@ -419,6 +394,168 @@ function myProfileHTML(user, group) {
       </div>
     </section>
   `;
+}
+
+function overviewDashboardHTML(group, holdings, consensusExposures) {
+  const summary = visibleSummary(holdings);
+  const members = group.members ?? [];
+  const contributingIDs = new Set(holdings.map((holding) => holding.ownerID));
+  const visibleHoldings = holdings.filter((holding) => canSeeValues(holding));
+  const latestSnapshotAt = groupLatestSnapshotAt(group.id);
+  const signals = groupSignalRows(group, holdings, consensusExposures);
+  const marketRows = groupMarketRows(visibleHoldings).slice(0, 4);
+
+  return `
+    <div class="panel group-overview-panel">
+      <div class="overview-heading compact">
+        <div class="min-w-0">
+          <div class="topbar-label">群组概况</div>
+          <h2 class="section-title">${escapeHTML(group.name)}</h2>
+          <div class="subtle">${escapeHTML(group.subtitle || "共享持仓与观点")}</div>
+        </div>
+        ${group.inviteCode
+          ? `<button class="pill blue pill-button invite-button" type="button" data-action="copy-invite" data-value="${escapeAttr(group.inviteCode)}">邀请码 <strong>${escapeHTML(group.inviteCode)}</strong></button>`
+          : ""}
+      </div>
+      <div class="overview-kpi-row">
+        ${overviewKPIHTML("已提交", `${contributingIDs.size}/${members.length || 0}`)}
+        ${overviewKPIHTML("可见市值", money(summary.marketValue, "USD"))}
+        ${overviewKPIHTML("共识标的", `${consensusExposures.length}`)}
+        ${overviewKPIHTML("最近更新", latestSnapshotAt ? formatDateTime(latestSnapshotAt) : "等待提交")}
+      </div>
+      <div class="overview-signal-list">
+        ${signals.map(signalRowHTML).join("")}
+      </div>
+      <div class="overview-market-row">
+        <span class="overview-market-label">市场分布</span>
+        <div class="overview-market-chips">
+          ${marketRows.length
+            ? marketRows.map((row, index) => `<span class="legend-chip tone-${index % 6}"><strong>${escapeHTML(row.label)}</strong><span>${escapeHTML(formatPercent(row.weight))}</span></span>`).join("")
+            : `<span class="legend-chip">暂无可见仓位</span>`}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function overviewKPIHTML(label, value) {
+  return `
+    <div class="overview-kpi">
+      <span>${escapeHTML(label)}</span>
+      <strong>${escapeHTML(value)}</strong>
+    </div>
+  `;
+}
+
+function groupSignalRows(group, holdings, consensusExposures) {
+  const visibleHoldings = holdings.filter((holding) => canSeeValues(holding));
+  const allVisibleExposures = exposureRows(holdings);
+  const consensusValue = consensusExposures.reduce((sum, exposure) => sum + exposure.marketValue, 0);
+  const totalVisibleValue = visibleHoldings.reduce((sum, holding) => sum + holdingMarketValueUSD(holding), 0);
+  const consensusStrength = totalVisibleValue > 0 ? consensusValue / totalVisibleValue : 0;
+  const consensusMembers = membersForExposure(consensusExposures[0]?.holderIDs ?? []);
+  const topSymbols = allVisibleExposures.slice(0, 6).map((exposure) => ({
+    symbol: exposure.symbol,
+    weight: totalVisibleValue > 0 ? exposure.marketValue / totalVisibleValue : 0
+  }));
+  const top3Weight = allVisibleExposures
+    .slice(0, 3)
+    .reduce((sum, exposure) => sum + (totalVisibleValue > 0 ? exposure.marketValue / totalVisibleValue : 0), 0);
+  const activeMembers = membersWithRecentSnapshots(group.id, 24);
+
+  return [
+    {
+      label: "共识强度",
+      value: formatPercent(consensusStrength),
+      detail: consensusExposures.length ? `${consensusExposures.length} 个多人持有标的` : "等待形成共同持仓",
+      progress: consensusStrength,
+      avatars: consensusMembers
+    },
+    {
+      label: "集中度 Top3",
+      value: formatPercent(top3Weight),
+      detail: topSymbols.slice(0, 3).map((item) => item.symbol).join(" / ") || "暂无可见仓位",
+      segments: topSymbols
+    },
+    {
+      label: "活跃度",
+      value: activeMembers.length ? `${activeMembers.length} 人` : "暂无",
+      detail: activeMembers.length ? "最近 24 小时有提交" : "最近 24 小时暂无提交",
+      dots: Math.min(Math.max(activeMembers.length, 0), 5),
+      avatars: activeMembers
+    }
+  ];
+}
+
+function signalRowHTML(signal) {
+  return `
+    <div class="overview-signal-row">
+      <div class="overview-signal-copy min-w-0">
+        <div class="overview-signal-label">${escapeHTML(signal.label)}</div>
+        <div class="overview-signal-detail">${escapeHTML(signal.detail)}</div>
+      </div>
+      <div class="overview-signal-visual">
+        <div class="overview-signal-value">${escapeHTML(signal.value)}</div>
+        ${signal.segments ? miniAllocationHTML(signal.segments, "overview-signal-strip") : signal.dots !== undefined ? activityDotsHTML(signal.dots) : compactProgressHTML(signal.progress)}
+        ${signal.avatars?.length ? avatarStackHTML(signal.avatars, 4) : ""}
+      </div>
+    </div>
+  `;
+}
+
+function activityDotsHTML(activeCount) {
+  return `
+    <div class="activity-dots" aria-hidden="true">
+      ${Array.from({ length: 5 }, (_, index) => `<span class="${index < activeCount ? "active" : ""}"></span>`).join("")}
+    </div>
+  `;
+}
+
+function compactProgressHTML(value = 0) {
+  const width = Math.max(0, Math.min(Number(value) || 0, 1)) * 100;
+  return `
+    <div class="compact-progress" aria-hidden="true">
+      <div class="compact-progress-fill" style="width: ${width}%;"></div>
+    </div>
+  `;
+}
+
+function membersForExposure(memberIDs) {
+  return memberIDs
+    .map((memberID) => memberForID(memberID))
+    .filter(Boolean);
+}
+
+function membersWithRecentSnapshots(groupID, hours = 24) {
+  const cutoff = Date.now() - (hours * 60 * 60 * 1000);
+  const memberIDs = new Set();
+  for (const snapshot of groupSnapshots(groupID)) {
+    const createdAt = new Date(snapshot.createdAt ?? 0).getTime();
+    if (Number.isFinite(createdAt) && createdAt >= cutoff) {
+      memberIDs.add(snapshot.ownerID);
+    }
+  }
+  return Array.from(memberIDs)
+    .map((memberID) => memberForID(memberID))
+    .filter(Boolean);
+}
+
+function groupMarketRows(holdings) {
+  const total = holdings.reduce((sum, holding) => sum + holdingMarketValueUSD(holding), 0);
+  const grouped = new Map();
+  for (const holding of holdings) {
+    const marketValue = holdingMarketValueUSD(holding);
+    grouped.set(holding.market, (grouped.get(holding.market) ?? 0) + marketValue);
+  }
+
+  return Array.from(grouped.entries())
+    .map(([market, marketValue]) => ({
+      market,
+      label: labelForMarket(market),
+      marketValue,
+      weight: total > 0 ? marketValue / total : 0
+    }))
+    .sort((first, second) => second.marketValue - first.marketValue);
 }
 
 function portfolioSectionHTML(group, ownerID, options = {}) {
