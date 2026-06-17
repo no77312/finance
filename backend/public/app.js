@@ -453,7 +453,7 @@ function groupSignalRows(group, holdings, consensusExposures) {
   const consensusValue = consensusExposures.reduce((sum, exposure) => sum + exposure.marketValue, 0);
   const totalVisibleValue = visibleHoldings.reduce((sum, holding) => sum + holdingMarketValueUSD(holding), 0);
   const consensusStrength = totalVisibleValue > 0 ? consensusValue / totalVisibleValue : 0;
-  const consensusMembers = membersForExposure(consensusExposures[0]?.holderIDs ?? []);
+  const memberCount = group.members?.length ?? 0;
   const topSymbols = allVisibleExposures.slice(0, 6).map((exposure) => ({
     symbol: exposure.symbol,
     weight: totalVisibleValue > 0 ? exposure.marketValue / totalVisibleValue : 0
@@ -468,8 +468,7 @@ function groupSignalRows(group, holdings, consensusExposures) {
       label: "共识强度",
       value: formatPercent(consensusStrength),
       detail: consensusExposures.length ? `${consensusExposures.length} 个多人持有标的` : "等待形成共同持仓",
-      progress: consensusStrength,
-      avatars: consensusMembers
+      progress: consensusStrength
     },
     {
       label: "集中度 Top3",
@@ -479,10 +478,9 @@ function groupSignalRows(group, holdings, consensusExposures) {
     },
     {
       label: "活跃度",
-      value: activeMembers.length ? `${activeMembers.length} 人` : "暂无",
-      detail: activeMembers.length ? "最近 24 小时有提交" : "最近 24 小时暂无提交",
-      dots: Math.min(Math.max(activeMembers.length, 0), 5),
-      avatars: activeMembers
+      value: memberCount ? `${activeMembers.length}/${memberCount}` : "暂无",
+      detail: activeMembers.length ? "最近 24 小时提交成员" : "最近 24 小时暂无提交",
+      progress: memberCount ? activeMembers.length / memberCount : 0
     }
   ];
 }
@@ -496,17 +494,8 @@ function signalRowHTML(signal) {
       </div>
       <div class="overview-signal-visual">
         <div class="overview-signal-value">${escapeHTML(signal.value)}</div>
-        ${signal.segments ? miniAllocationHTML(signal.segments, "overview-signal-strip") : signal.dots !== undefined ? activityDotsHTML(signal.dots) : compactProgressHTML(signal.progress)}
-        ${signal.avatars?.length ? avatarStackHTML(signal.avatars, 4) : ""}
+        ${signal.segments ? miniAllocationHTML(signal.segments, "overview-signal-strip") : compactProgressHTML(signal.progress)}
       </div>
-    </div>
-  `;
-}
-
-function activityDotsHTML(activeCount) {
-  return `
-    <div class="activity-dots" aria-hidden="true">
-      ${Array.from({ length: 5 }, (_, index) => `<span class="${index < activeCount ? "active" : ""}"></span>`).join("")}
     </div>
   `;
 }
@@ -518,12 +507,6 @@ function compactProgressHTML(value = 0) {
       <div class="compact-progress-fill" style="width: ${width}%;"></div>
     </div>
   `;
-}
-
-function membersForExposure(memberIDs) {
-  return memberIDs
-    .map((memberID) => memberForID(memberID))
-    .filter(Boolean);
 }
 
 function membersWithRecentSnapshots(groupID, hours = 24) {

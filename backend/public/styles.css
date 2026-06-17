@@ -775,23 +775,6 @@ button.list-item.active {
   height: 7px;
 }
 
-.activity-dots {
-  display: flex;
-  justify-content: flex-end;
-  gap: 5px;
-}
-
-.activity-dots span {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #d8dce4;
-}
-
-.activity-dots span.active {
-  background: var(--accent);
-}
-
 .overview-market-row {
   display: flex;
   align-items: center;
