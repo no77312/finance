@@ -86,6 +86,7 @@ const securityCompletionSchema = {
 };
 
 const AMOUNT_SOURCE = "(?:HK\\$|US\\$|S\\$|[$¥]|USD|HKD|CNY|SGD)?\\s*([-+]?\\d[\\d,]*(?:\\.\\d+)?\\s*[Kk万]?)";
+const unsupportedIBKRExchangesPattern = /\b(?:KRX|TPEX|SFB)\b/i;
 
 const knownSecurityIdentities = new Map([
   ["雅迪控股", { symbol: "1585", assetName: "雅迪集团控股有限公司", market: "hkStock", currency: "HKD" }],
@@ -205,6 +206,9 @@ async function parseWithOpenAI({ text, imageURL, visibility, brokerHint, locale 
                   "例如华宝/同花顺截图中一行显示“雅迪控股 18,550.20”，并在“成本/现价”列显示“HK$11.641 / HK$10.750”，应返回 marketValue:18550.20、averageCost:11.641、lastPrice:10.750，并用 18550.20 / 10.750 推算 quantity。",
                   "港股价格带 HK$ 或界面标记“深港/沪港”时 currency 通常是 HKD，market 用 hkStock；A 股代码 6 位且无 HK$ 时 market 用 cnStock、currency 用 CNY。",
                   "IBKR/Interactive Brokers：Instrument 是标的，Last 是现价，Position 是数量，MKT VAL/Mkt Val 是总市值；成本价常常不在截图中，应返回 averageCost:null。",
+                  "IBKR 持仓表里 Position 后面的 P&L、Change、Chg% 不是市值，不要把它们填入 marketValue；如果没有逐行 MKT VAL，可用 Last × Position 计算 marketValue。",
+                  "IBKR 行里 Last 为 n/a 时，lastPrice 和 marketValue 必须返回 null，只保留 quantity 等可确认字段。",
+                  "当前暂不支持 KRX、TPEX、SFB 等非美股/港股/A股交易所，遇到这些交易所代码的行不要返回。",
                   "visibility 使用用户默认值。",
                   "brokerName 识别券商或交易 App 名称，例如 富途、老虎、Interactive Brokers；未知时返回空字符串。",
                   "accountName 识别账户类型、账户名、账号尾号或截图中的账户标签；未知时返回空字符串。",
@@ -441,31 +445,40 @@ function contextForSymbol(lines, startIndex) {
 function normalizeDrafts(drafts = [], fallbackVisibility, fallbackBrokerName = "") {
   return drafts
     .map((draft) => {
-      const rawSymbol = cleanSymbol(draft.symbol);
+      if (isUnsupportedExchangeDraft(draft)) {
+        return null;
+      }
+
+      const brokerAdjustedDraft = normalizeBrokerSpecificDraft(draft);
+      const rawSymbol = cleanSymbol(brokerAdjustedDraft.symbol);
       if (!rawSymbol) {
         return null;
       }
 
-      const market = assetMarkets.has(draft.market) ? draft.market : marketFromSymbol(rawSymbol, draft.rawText ?? "");
-      const currency = holdingCurrencies.has(draft.currency)
-        ? draft.currency
-        : currencyFromText(draft.rawText ?? "", rawSymbol);
+      const market = assetMarkets.has(brokerAdjustedDraft.market)
+        ? brokerAdjustedDraft.market
+        : marketFromSymbol(rawSymbol, brokerAdjustedDraft.rawText ?? "");
+      const currency = holdingCurrencies.has(brokerAdjustedDraft.currency)
+        ? brokerAdjustedDraft.currency
+        : currencyFromText(brokerAdjustedDraft.rawText ?? "", rawSymbol);
       const symbol = normalizeSymbolForMarket(rawSymbol, market, currency);
-      const visibility = positionVisibilities.has(draft.visibility) ? draft.visibility : fallbackVisibility;
-      const brokerName = cleanString(draft.brokerName) || cleanString(fallbackBrokerName);
-      const accountName = cleanString(draft.accountName);
-      const accountKey = cleanAccountKey(draft.accountKey || [brokerName, accountName].filter(Boolean).join(":"));
-      const rawNumbers = inferNumbersFromRawText(draft.rawText);
+      const visibility = positionVisibilities.has(brokerAdjustedDraft.visibility)
+        ? brokerAdjustedDraft.visibility
+        : fallbackVisibility;
+      const brokerName = cleanString(brokerAdjustedDraft.brokerName) || cleanString(fallbackBrokerName);
+      const accountName = cleanString(brokerAdjustedDraft.accountName);
+      const accountKey = cleanAccountKey(brokerAdjustedDraft.accountKey || [brokerName, accountName].filter(Boolean).join(":"));
+      const rawNumbers = inferNumbersFromRawText(brokerAdjustedDraft.rawText);
       const normalizedPrices = normalizePriceAndCost({
-        quantity: optionalPositive(draft.quantity) ?? rawNumbers.quantity,
-        averageCost: optionalNonNegative(draft.averageCost) ?? rawNumbers.averageCost,
-        lastPrice: optionalNonNegative(draft.lastPrice) ?? rawNumbers.lastPrice,
-        marketValue: optionalNonNegative(draft.marketValue) ?? rawNumbers.marketValue
+        quantity: optionalPositive(brokerAdjustedDraft.quantity) ?? rawNumbers.quantity,
+        averageCost: optionalNonNegative(brokerAdjustedDraft.averageCost) ?? rawNumbers.averageCost,
+        lastPrice: optionalNonNegative(brokerAdjustedDraft.lastPrice) ?? rawNumbers.lastPrice,
+        marketValue: optionalNonNegative(brokerAdjustedDraft.marketValue) ?? rawNumbers.marketValue
       });
 
       return {
         symbol,
-        assetName: cleanString(draft.assetName) || symbol,
+        assetName: cleanString(brokerAdjustedDraft.assetName) || symbol,
         market,
         quantity: normalizedPrices.quantity,
         averageCost: normalizedPrices.averageCost,
@@ -476,12 +489,42 @@ function normalizeDrafts(drafts = [], fallbackVisibility, fallbackBrokerName = "
         brokerName,
         accountName,
         accountKey,
-        confidence: clamp(Number(draft.confidence), 0, 1) || 0.4,
-        note: cleanString(draft.note),
-        rawText: cleanString(draft.rawText)
+        confidence: clamp(Number(brokerAdjustedDraft.confidence), 0, 1) || 0.4,
+        note: cleanString(brokerAdjustedDraft.note),
+        rawText: cleanString(brokerAdjustedDraft.rawText)
       };
     })
     .filter(Boolean);
+}
+
+function isUnsupportedExchangeDraft(draft) {
+  const brokerText = `${draft.brokerName ?? ""} ${draft.accountKey ?? ""}`;
+  const rawText = cleanString(draft.rawText);
+  return /Interactive Brokers|IBKR/i.test(brokerText) && unsupportedIBKRExchangesPattern.test(rawText);
+}
+
+function normalizeBrokerSpecificDraft(draft) {
+  const brokerText = `${draft.brokerName ?? ""} ${draft.accountKey ?? ""}`;
+  const rawText = cleanString(draft.rawText);
+  if (!/Interactive Brokers|IBKR/i.test(brokerText)) {
+    return draft;
+  }
+
+  const adjusted = {
+    ...draft,
+    averageCost: null
+  };
+
+  if (!/\b(?:MKT\s*VAL|MARKET\s*VALUE|Mkt\s*Val)\b/i.test(rawText)) {
+    adjusted.marketValue = null;
+  }
+
+  if (/\bn\/a\b/i.test(rawText)) {
+    adjusted.lastPrice = null;
+    adjusted.marketValue = null;
+  }
+
+  return adjusted;
 }
 
 function applySecurityCompletions(drafts, completions = []) {
@@ -662,28 +705,33 @@ function positiveNumberFromMatch(match, index) {
 function normalizePriceAndCost({ quantity, averageCost, lastPrice, marketValue }) {
   let normalizedQuantity = quantity;
   let normalizedLastPrice = lastPrice;
+  let normalizedMarketValue = marketValue;
 
-  if (normalizedQuantity === null && marketValue !== null && normalizedLastPrice !== null && normalizedLastPrice > 0) {
-    normalizedQuantity = roundImportNumber(marketValue / normalizedLastPrice);
+  if (normalizedQuantity === null && normalizedMarketValue !== null && normalizedLastPrice !== null && normalizedLastPrice > 0) {
+    normalizedQuantity = roundImportNumber(normalizedMarketValue / normalizedLastPrice);
   }
 
-  if (normalizedLastPrice === null && marketValue !== null && normalizedQuantity !== null && normalizedQuantity > 0) {
-    normalizedLastPrice = roundImportNumber(marketValue / normalizedQuantity);
+  if (normalizedLastPrice === null && normalizedMarketValue !== null && normalizedQuantity !== null && normalizedQuantity > 0) {
+    normalizedLastPrice = roundImportNumber(normalizedMarketValue / normalizedQuantity);
+  }
+
+  if (normalizedMarketValue === null && normalizedQuantity !== null && normalizedLastPrice !== null) {
+    normalizedMarketValue = roundImportNumber(normalizedQuantity * normalizedLastPrice);
   }
 
   if (
     normalizedQuantity
-    && marketValue
+    && normalizedMarketValue
     && averageCost !== null
     && normalizedLastPrice !== null
-    && pricesAreClose(marketValue / normalizedQuantity, averageCost)
-    && !pricesAreClose(marketValue / normalizedQuantity, normalizedLastPrice)
+    && pricesAreClose(normalizedMarketValue / normalizedQuantity, averageCost)
+    && !pricesAreClose(normalizedMarketValue / normalizedQuantity, normalizedLastPrice)
   ) {
     return {
       quantity: normalizedQuantity,
       averageCost: normalizedLastPrice,
       lastPrice: averageCost,
-      marketValue
+      marketValue: normalizedMarketValue
     };
   }
 
@@ -691,7 +739,7 @@ function normalizePriceAndCost({ quantity, averageCost, lastPrice, marketValue }
     quantity: normalizedQuantity,
     averageCost,
     lastPrice: normalizedLastPrice,
-    marketValue
+    marketValue: normalizedMarketValue
   };
 }
 

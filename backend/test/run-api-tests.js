@@ -49,6 +49,7 @@ async function main() {
     await parsesScreenshotImportDraftsWithoutModelKey();
     await correctsModelPriceCostOrderFromMarketValue();
     await parsesImageModelDraftWithoutAverageCost();
+    await sanitizesInteractiveBrokersScreenshotDrafts();
     await signsInAndJoinsGroupByInviteCode();
     await signsInWithGoogleAndCreatesGroup();
     await createsGroupForSignedInUser();
@@ -172,7 +173,7 @@ async function parsesScreenshotImportDraftsWithoutModelKey() {
     assert.ok(parsed.holdings.some((holding) => holding.symbol === "AAPL"));
     assert.ok(parsed.holdings.some((holding) => holding.symbol === "0700"));
     assert.equal(parsed.holdings.find((holding) => holding.symbol === "AAPL").visibility, "amountOnly");
-    assert.equal(parsed.holdings.find((holding) => holding.symbol === "AAPL").marketValue, null);
+    assert.equal(parsed.holdings.find((holding) => holding.symbol === "AAPL").marketValue, 630);
   } finally {
     if (previousKey) {
       process.env.OPENAI_API_KEY = previousKey;
@@ -346,6 +347,115 @@ async function parsesImageModelDraftWithoutAverageCost() {
     assert.equal(parsed.holdings[1].averageCost, 44.486);
     assert.equal(parsed.holdings[1].lastPrice, 42.71);
     assert.ok(!parsed.warnings.some((warning) => warning.includes("缺少数量")));
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (previousKey) {
+      process.env.OPENAI_API_KEY = previousKey;
+    } else {
+      delete process.env.OPENAI_API_KEY;
+    }
+  }
+}
+
+async function sanitizesInteractiveBrokersScreenshotDrafts() {
+  const previousFetch = globalThis.fetch;
+  const previousKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = "test-key";
+
+  globalThis.fetch = async (_url, options) => {
+    JSON.parse(options.body);
+    return new Response(JSON.stringify({
+      output_text: JSON.stringify({
+        holdings: [
+          {
+            symbol: "SNDK",
+            assetName: "SNDK",
+            market: "usStock",
+            quantity: 131,
+            averageCost: 1,
+            lastPrice: 1248.55,
+            marketValue: 8036,
+            currency: "USD",
+            visibility: "amountOnly",
+            brokerName: "Interactive Brokers",
+            accountName: "",
+            accountKey: "IBKR",
+            confidence: 0.9,
+            note: "",
+            rawText: "SNDK NASDAQ.NMS 1248.55 131 8036"
+          },
+          {
+            symbol: "SIVE",
+            assetName: "SIVE",
+            market: "usStock",
+            quantity: 2000,
+            averageCost: null,
+            lastPrice: 17.45,
+            marketValue: 34900,
+            currency: "USD",
+            visibility: "amountOnly",
+            brokerName: "Interactive Brokers",
+            accountName: "",
+            accountKey: "IBKR",
+            confidence: 0.7,
+            note: "模型误把P&L当市值",
+            rawText: "SIVE SFB n/a 2.00K 34900"
+          },
+          {
+            symbol: "402340",
+            assetName: "402340",
+            market: "hkStock",
+            quantity: 1,
+            averageCost: null,
+            lastPrice: 994000,
+            marketValue: 994000,
+            currency: "HKD",
+            visibility: "amountOnly",
+            brokerName: "Interactive Brokers",
+            accountName: "",
+            accountKey: "IBKR",
+            confidence: 0.8,
+            note: "unsupported exchange",
+            rawText: "402340 KRX 994000 1 40000"
+          },
+          {
+            symbol: "AAOI",
+            assetName: "AAOI",
+            market: "usStock",
+            quantity: 330,
+            averageCost: null,
+            lastPrice: 173.28,
+            marketValue: 52.5,
+            currency: "USD",
+            visibility: "amountOnly",
+            brokerName: "Interactive Brokers",
+            accountName: "",
+            accountKey: "IBKR",
+            confidence: 0.9,
+            note: "",
+            rawText: "AAOI NASDAQ.NMS 173.28 330 -52.50"
+          }
+        ],
+        warnings: ["已排除所有期权合约持仓"]
+      })
+    }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    });
+  };
+
+  try {
+    const parsed = await parseScreenshotImport({
+      defaultVisibility: "amountOnly",
+      imageDataURL: "data:image/png;base64,AAAA",
+      brokerHint: "Interactive Brokers / IBKR"
+    });
+
+    const symbols = parsed.holdings.map((holding) => holding.symbol);
+    assert.deepEqual(symbols, ["SNDK", "AAOI"]);
+    assert.equal(parsed.holdings[0].averageCost, null);
+    assert.equal(parsed.holdings[0].marketValue, 163560.05);
+    assert.equal(parsed.holdings[1].marketValue, 57182.4);
   } finally {
     globalThis.fetch = previousFetch;
     if (previousKey) {
