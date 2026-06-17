@@ -445,6 +445,10 @@ function contextForSymbol(lines, startIndex) {
 function normalizeDrafts(drafts = [], fallbackVisibility, fallbackBrokerName = "") {
   return drafts
     .map((draft) => {
+      if (isOptionLikeDraft(draft)) {
+        return null;
+      }
+
       if (isUnsupportedExchangeDraft(draft)) {
         return null;
       }
@@ -495,6 +499,12 @@ function normalizeDrafts(drafts = [], fallbackVisibility, fallbackBrokerName = "
       };
     })
     .filter(Boolean);
+}
+
+function isOptionLikeDraft(draft) {
+  const text = `${draft.symbol ?? ""} ${draft.assetName ?? ""} ${draft.rawText ?? ""}`;
+  return /\b(?:Call|Put)\b/i.test(text)
+    && /(?:\b\d{2}\s+'?\d{2}\b|\b\d{4}\b|\bJAN|\bFEB|\bMAR|\bAPR|\bMAY|\bJUN|\bJUL|\bAUG|\bSEP|\bOCT|\bNOV|\bDEC)/i.test(text);
 }
 
 function isUnsupportedExchangeDraft(draft) {

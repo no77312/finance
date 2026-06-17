@@ -419,6 +419,23 @@ async function sanitizesInteractiveBrokersScreenshotDrafts() {
             rawText: "402340 KRX 994000 1 40000"
           },
           {
+            symbol: "AMD",
+            assetName: "AMD",
+            market: "usStock",
+            quantity: null,
+            averageCost: null,
+            lastPrice: 9.3,
+            marketValue: null,
+            currency: "USD",
+            visibility: "amountOnly",
+            brokerName: "Interactive Brokers",
+            accountName: "",
+            accountKey: "IBKR",
+            confidence: 0.9,
+            note: "This is a put option, excluded.",
+            rawText: "AMD MAY 08 '26 330 Put 9.30 0.03% 70.64% -4 110.52"
+          },
+          {
             symbol: "AAOI",
             assetName: "AAOI",
             market: "usStock",
