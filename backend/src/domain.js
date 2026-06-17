@@ -185,7 +185,7 @@ export function normalizeHoldingInput(body, groupID, ownerID, existingHolding = 
   }
 
   const quantity = positiveNumber(body.quantity, "quantity");
-  const averageCost = nonNegativeNumber(body.averageCost, "averageCost");
+  const averageCost = optionalNonNegativeNumber(body.averageCost, "averageCost");
   const lastPrice = nonNegativeNumber(body.lastPrice, "lastPrice");
   const requestedID = cleanString(body.id).toUpperCase();
   const lastPriceWasChanged = Boolean(
@@ -300,7 +300,14 @@ function marketValue(holding) {
 }
 
 function costBasis(holding) {
-  return Number(holding.quantity) * Number(holding.averageCost);
+  if (holding.averageCost === null || holding.averageCost === undefined || holding.averageCost === "") {
+    return 0;
+  }
+  const averageCost = Number(holding.averageCost);
+  if (!Number.isFinite(averageCost)) {
+    return 0;
+  }
+  return Number(holding.quantity) * averageCost;
 }
 
 function groupBy(items, keyForItem) {
@@ -363,6 +370,13 @@ function nonNegativeNumber(value, fieldName) {
     throw badRequest("INVALID_NUMBER", `${fieldName} must be a non-negative number.`);
   }
   return number;
+}
+
+function optionalNonNegativeNumber(value, fieldName) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  return nonNegativeNumber(value, fieldName);
 }
 
 function generateInviteCode() {

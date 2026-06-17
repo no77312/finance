@@ -166,6 +166,42 @@ function bindEvents() {
       parseScreenshot(new FormData(form), form);
     }
   });
+
+  app.addEventListener("input", updateDraftFromControl);
+  app.addEventListener("change", updateDraftFromControl);
+}
+
+function updateDraftFromControl(event) {
+  const control = event.target.closest("[data-draft-field]");
+  if (!control) {
+    return;
+  }
+
+  const index = Number(control.dataset.draftIndex);
+  const field = control.dataset.draftField;
+  const draft = state.drafts[index];
+  if (!draft || !field) {
+    return;
+  }
+
+  draft[field] = draftFieldValue(field, control.value);
+}
+
+function draftFieldValue(field, value) {
+  if (["quantity", "averageCost", "lastPrice"].includes(field)) {
+    const trimmed = String(value ?? "").trim();
+    if (!trimmed) {
+      return null;
+    }
+    const number = Number(trimmed);
+    return Number.isFinite(number) ? number : null;
+  }
+
+  if (field === "symbol") {
+    return normalizeSymbol(value);
+  }
+
+  return String(value ?? "").trim();
 }
 
 async function handleGoogleCredential(response) {
@@ -820,7 +856,7 @@ function holdingFormHTML(group) {
       </div>
       <div class="two-col form-grid">
         ${fieldHTML("quantity", "数量", holding?.quantity ?? "", "number", true)}
-        ${fieldHTML("averageCost", "成本价", holding?.averageCost ?? "", "number", true)}
+        ${fieldHTML("averageCost", "成本价（可选）", holding?.averageCost ?? "", "number", false)}
       </div>
       <div class="two-col form-grid">
         ${fieldHTML("lastPrice", "现价", holding?.lastPrice ?? "", "number", true)}
@@ -867,12 +903,13 @@ function draftsHTML() {
           <div class="section-header-copy">
             <h3 class="section-title">解析结果</h3>
             ${draftMetaHTML()}
+            <div class="subtle">识别结果可以先手工调整；成本价可留空，数量和现价用于计算市值。</div>
           </div>
           <button class="secondary-button" type="button" data-action="import-drafts" ${state.busy || !state.drafts.length ? "disabled" : ""}>同步本次持仓</button>
         </div>
         ${draftWarningsHTML()}
         <div class="draft-list">
-          ${state.drafts.length ? state.drafts.map((draft) => holdingDraftHTML(draft)).join("") : `<div class="empty">还没有可导入的识别结果。</div>`}
+          ${state.drafts.length ? state.drafts.map((draft, index) => holdingDraftHTML(draft, index)).join("") : `<div class="empty">还没有可导入的识别结果。</div>`}
         </div>
     </section>
   `;
@@ -922,7 +959,7 @@ function holdingHTML(holding, options = {}) {
   const showCost = canSeeCost(holding);
   const marketValue = holdingMarketValueUSD(holding);
   const costBasis = holdingCostBasisUSD(holding);
-  const pnl = marketValue - costBasis;
+  const pnl = showCost ? marketValue - costBasis : null;
   const portfolio = options.portfolio ?? null;
   const emphasizeWeight = Boolean(options.emphasizeWeight && portfolio);
   const primaryValue = emphasizeWeight
@@ -971,11 +1008,11 @@ function holdingHTML(holding, options = {}) {
   `;
 }
 
-function holdingDraftHTML(draft) {
-  const complete = draft.quantity !== null && draft.averageCost !== null && draft.lastPrice !== null;
+function holdingDraftHTML(draft, index) {
+  const complete = isImportableDraft(draft);
   const sourceLabel = draftSourceLabel(draft);
   return `
-    <article class="list-item">
+    <article class="list-item draft-card">
       <div class="holding-row">
         <div class="min-w-0">
           <div class="holding-title">${escapeHTML(draft.assetName || draft.symbol)}</div>
@@ -989,12 +1026,53 @@ function holdingDraftHTML(draft) {
         </div>
         <span class="pill ${complete ? "green" : "red"}">${complete ? "可导入" : "需核对"}</span>
       </div>
-      <div class="row-meta">
-        <span>数量 ${formatMaybe(draft.quantity)}</span>
-        <span>成本 ${formatMaybe(draft.averageCost)}</span>
-        <span>现价 ${formatMaybe(draft.lastPrice)}</span>
+      <div class="draft-edit-grid">
+        ${draftInputHTML(index, "symbol", "代码", draft.symbol, "text", true)}
+        ${draftInputHTML(index, "assetName", "名称", draft.assetName || "", "text", false)}
+        ${draftSelectHTML(index, "market", "市场", draft.market || "usStock", markets())}
+        ${draftSelectHTML(index, "currency", "币种", draft.currency || "USD", currencies())}
+        ${draftInputHTML(index, "quantity", "数量", draft.quantity, "number", true)}
+        ${draftInputHTML(index, "averageCost", "成本价（可选）", draft.averageCost, "number", false)}
+        ${draftInputHTML(index, "lastPrice", "现价", draft.lastPrice, "number", true)}
+        ${draftSelectHTML(index, "visibility", "可见性", draft.visibility || "amountOnly", visibilities())}
       </div>
     </article>
+  `;
+}
+
+function isImportableDraft(draft) {
+  const quantity = finiteNumber(draft.quantity);
+  const lastPrice = finiteNumber(draft.lastPrice);
+  return Boolean(draft.symbol && quantity !== null && quantity > 0 && lastPrice !== null && lastPrice >= 0);
+}
+
+function draftInputHTML(index, field, label, value, type = "text", required = false) {
+  const inputMode = type === "number" ? "decimal" : "text";
+  const step = type === "number" ? ` step="any"` : "";
+  return `
+    <label class="draft-field">
+      <span>${escapeHTML(label)}</span>
+      <input
+        data-draft-index="${index}"
+        data-draft-field="${escapeAttr(field)}"
+        type="${type}"
+        inputmode="${inputMode}"
+        value="${escapeAttr(value ?? "")}"
+        ${step}
+        ${required ? "required" : ""}
+      >
+    </label>
+  `;
+}
+
+function draftSelectHTML(index, field, label, selected, options) {
+  return `
+    <label class="draft-field">
+      <span>${escapeHTML(label)}</span>
+      <select data-draft-index="${index}" data-draft-field="${escapeAttr(field)}">
+        ${options.map(([value, text]) => `<option value="${escapeAttr(value)}" ${value === selected ? "selected" : ""}>${escapeHTML(text)}</option>`).join("")}
+      </select>
+    </label>
   `;
 }
 
@@ -1078,7 +1156,7 @@ function holdingStatsHTML({
     },
     {
       label: "成本",
-      value: showCost ? money(convertMoneyToUSD(holding.averageCost, holding.currency), "USD") : "不可见"
+      value: showCost ? money(convertMoneyToUSD(holding.averageCost, holding.currency), "USD") : "待补"
     },
     {
       label: "现价",
@@ -1106,7 +1184,7 @@ function holdingStatsHTML({
       `).join("")}
     </div>
     ${holding.priceDate ? `<div class="holding-stat-note">价格日期 ${escapeHTML(holding.priceDate)}</div>` : ""}
-    ${showCost ? "" : `<div class="holding-hidden-note">这条持仓隐藏了成本价，占比仅按当前可见市值计算。</div>`}
+    ${showCost ? "" : `<div class="holding-hidden-note">成本价缺失或未公开，盈亏暂不计算，占比按当前可见市值计算。</div>`}
   `;
 }
 
@@ -1475,6 +1553,9 @@ function accumulateDrafts(previousDraft, nextDraft) {
 }
 
 function finiteNumber(value) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 }
@@ -1547,12 +1628,10 @@ async function importDrafts() {
     return;
   }
 
-  const importable = state.drafts.filter((draft) => (
-    draft.symbol && draft.quantity !== null && draft.averageCost !== null && draft.lastPrice !== null
-  ));
+  const importable = state.drafts.filter(isImportableDraft);
 
   if (!importable.length) {
-    setNotice("error", "没有完整的草稿可以导入。");
+    setNotice("error", "没有可导入的草稿，请至少补全代码、数量和现价。");
     return;
   }
 
@@ -1564,9 +1643,9 @@ async function importDrafts() {
           symbol: draft.symbol,
           assetName: draft.assetName || draft.symbol,
           market: draft.market || "usStock",
-          quantity: draft.quantity,
-          averageCost: draft.averageCost,
-          lastPrice: draft.lastPrice,
+          quantity: finiteNumber(draft.quantity),
+          averageCost: finiteNumber(draft.averageCost),
+          lastPrice: finiteNumber(draft.lastPrice),
           currency: draft.currency || "USD",
           visibility: draft.visibility || "amountOnly",
           note: draft.note || "截图同步"
@@ -1789,7 +1868,7 @@ function canSeeValues(holding) {
 }
 
 function canSeeCost(holding) {
-  return isMine(holding) || holding.visibility === "full";
+  return (isMine(holding) || holding.visibility === "full") && finiteNumber(holding.averageCost) !== null;
 }
 
 function isMine(holding) {
@@ -2361,7 +2440,11 @@ function holdingMarketValueUSD(holding) {
 }
 
 function holdingCostBasisUSD(holding) {
-  return convertMoneyToUSD(Number(holding.quantity) * Number(holding.averageCost), holding.currency);
+  const averageCost = finiteNumber(holding.averageCost);
+  if (averageCost === null) {
+    return 0;
+  }
+  return convertMoneyToUSD(Number(holding.quantity) * averageCost, holding.currency);
 }
 
 function sourceCurrencyHTML(currency) {
@@ -2377,12 +2460,21 @@ function holdingPayloadFromForm(formData) {
     assetName: formData.get("assetName"),
     market: formData.get("market"),
     quantity: Number(formData.get("quantity")),
-    averageCost: Number(formData.get("averageCost")),
+    averageCost: optionalNumberFromForm(formData.get("averageCost")),
     lastPrice: Number(formData.get("lastPrice")),
     currency: formData.get("currency"),
     visibility: formData.get("visibility"),
     note: formData.get("note")
   };
+}
+
+function optionalNumberFromForm(value) {
+  const text = String(value ?? "").trim();
+  if (!text) {
+    return null;
+  }
+  const number = Number(text);
+  return Number.isFinite(number) ? number : null;
 }
 
 async function imageFileToDataURL(file) {

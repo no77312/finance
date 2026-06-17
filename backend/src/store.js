@@ -87,13 +87,21 @@ function snapshotHoldingFromHolding(holding) {
     assetName: holding.assetName,
     market: holding.market,
     quantity: Number(holding.quantity),
-    averageCost: Number(holding.averageCost),
+    averageCost: optionalNumber(holding.averageCost),
     lastPrice: Number(holding.lastPrice),
     currency: holding.currency,
     visibility: holding.visibility,
     note: holding.note ?? "",
     updatedAt: holding.updatedAt ?? null
   };
+}
+
+function optionalNumber(value) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
 }
 
 function usersFromGroups(groups) {

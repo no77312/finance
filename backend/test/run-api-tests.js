@@ -48,6 +48,7 @@ async function main() {
     await servesHealthAndBootstrapData();
     await parsesScreenshotImportDraftsWithoutModelKey();
     await correctsModelPriceCostOrderFromMarketValue();
+    await parsesImageModelDraftWithoutAverageCost();
     await signsInAndJoinsGroupByInviteCode();
     await signsInWithGoogleAndCreatesGroup();
     await createsGroupForSignedInUser();
@@ -236,6 +237,67 @@ async function correctsModelPriceCostOrderFromMarketValue() {
   }
 }
 
+async function parsesImageModelDraftWithoutAverageCost() {
+  const previousFetch = globalThis.fetch;
+  const previousKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = "test-key";
+  let requestBody = null;
+
+  globalThis.fetch = async (_url, options) => {
+    requestBody = JSON.parse(options.body);
+    return new Response(JSON.stringify({
+      output_text: JSON.stringify({
+        holdings: [
+          {
+            symbol: "SNDK",
+            assetName: "SanDisk",
+            market: "usStock",
+            quantity: 131,
+            averageCost: null,
+            lastPrice: 1248.55,
+            marketValue: 163560.05,
+            currency: "USD",
+            visibility: "amountOnly",
+            brokerName: "Interactive Brokers",
+            accountName: "Portfolio All",
+            accountKey: "Interactive Brokers:Portfolio All",
+            confidence: 0.9,
+            note: "截图未展示成本价",
+            rawText: "SNDK Last 1248.55 Position 131"
+          }
+        ],
+        warnings: ["SNDK 缺少成本价，已留空。"]
+      })
+    }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    });
+  };
+
+  try {
+    const parsed = await parseScreenshotImport({
+      defaultVisibility: "amountOnly",
+      imageDataURL: "data:image/png;base64,AAAA",
+      brokerHint: "IBKR"
+    });
+
+    const userContent = requestBody.input.find((item) => item.role === "user").content;
+    assert.ok(userContent.some((item) => item.type === "input_image"));
+    assert.equal(parsed.source, "model");
+    assert.equal(parsed.holdings[0].symbol, "SNDK");
+    assert.equal(parsed.holdings[0].averageCost, null);
+    assert.equal(parsed.holdings[0].lastPrice, 1248.55);
+    assert.ok(parsed.warnings.some((warning) => warning.includes("成本价")));
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (previousKey) {
+      process.env.OPENAI_API_KEY = previousKey;
+    } else {
+      delete process.env.OPENAI_API_KEY;
+    }
+  }
+}
+
 async function refreshesPricesWithoutBreakingWhenProviderDisabled() {
   const refreshed = await postJson(`/api/groups/${groupID}/prices/refresh`, {}, refreshHeaders());
 
@@ -289,7 +351,7 @@ async function syncsSnapshotHoldingsForCurrentMember() {
         assetName: "Microsoft",
         market: "usStock",
         quantity: 10,
-        averageCost: 390,
+        averageCost: null,
         lastPrice: 450,
         currency: "USD",
         visibility: "full",
@@ -318,6 +380,7 @@ async function syncsSnapshotHoldingsForCurrentMember() {
   const mine = holdings.holdings.filter((holding) => holding.ownerID === memberID);
   assert.deepEqual(mine.map((holding) => holding.symbol).sort(), ["AAPL", "MSFT"]);
   assert.equal(mine.find((holding) => holding.symbol === "MSFT").quantity, 10);
+  assert.equal(mine.find((holding) => holding.symbol === "MSFT").averageCost, null);
   assert.equal(mine.find((holding) => holding.symbol === "AAPL").visibility, "amountOnly");
 
   const events = await getJson(`/api/groups/${groupID}/holding-events`);
@@ -330,6 +393,7 @@ async function syncsSnapshotHoldingsForCurrentMember() {
   assert.equal(memberSnapshots.length >= 2, true);
   assert.equal(memberSnapshots.at(-1).source, "screenshot");
   assert.deepEqual(memberSnapshots.at(-1).holdings.map((holding) => holding.symbol), ["AAPL", "MSFT"]);
+  assert.equal(memberSnapshots.at(-1).holdings.find((holding) => holding.symbol === "MSFT").averageCost, null);
 }
 
 async function updatesAndDeletesOwnedHolding() {

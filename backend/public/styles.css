@@ -1454,6 +1454,47 @@ button.list-item.active {
   background: #fbfbfd;
 }
 
+.draft-card {
+  gap: 14px;
+}
+
+.draft-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.draft-field {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.draft-field span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.draft-field input,
+.draft-field select {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 9px 10px;
+  background: #ffffff;
+  color: var(--ink);
+  font-size: 14px;
+  outline: none;
+}
+
+.draft-field input:focus,
+.draft-field select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.12);
+}
+
 .file-drop {
   display: grid;
   gap: 10px;

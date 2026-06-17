@@ -115,7 +115,8 @@ async function parseWithOpenAI({ text, imageURL, visibility, brokerHint, locale 
         `默认可见性：${visibility}`,
         `语言环境：${locale}`,
         `券商提示：${brokerHint || "未知"}`,
-        text ? "OCR 文本：" : "截图中未提供 OCR 文本，请直接识别图片。",
+        imageURL ? "请优先直接识别图片中的持仓表格，OCR 文本仅供辅助。" : "未提供图片，请从 OCR 文本中解析。",
+        text ? "辅助 OCR 文本：" : "没有辅助 OCR 文本。",
         text || ""
       ].join("\n")
     }
@@ -140,7 +141,7 @@ async function parseWithOpenAI({ text, imageURL, visibility, brokerHint, locale 
         model: process.env.OPENAI_MODEL || DEFAULT_MODEL,
         store: false,
         temperature: 0.1,
-        max_output_tokens: 2500,
+        max_output_tokens: 5000,
         input: [
           {
             role: "system",
@@ -149,11 +150,17 @@ async function parseWithOpenAI({ text, imageURL, visibility, brokerHint, locale 
                 type: "input_text",
                 text: [
                   "你是持仓截图解析器。只输出符合 schema 的 JSON。",
-                  "任务：从券商持仓页 OCR 文本中提取可导入的持仓草稿。",
+                  "任务：直接阅读券商持仓截图中的表格和列标题，提取可导入的持仓草稿；OCR 文本只作为辅助。",
                   "只提取股票、ETF、基金、现金、加密资产等真实持仓行；忽略总资产、今日盈亏、广告、按钮和导航文案。",
+                  "暂不支持期权合约：Interactive Brokers 等截图中带有 Call、Put、到期日、行权价的期权行不要作为股票持仓返回。",
                   "字段不确定时用 null，不要编造数量、成本或现价。",
+                  "averageCost 成本价不是必填；截图没有成本价时必须返回 null，不要用现价、盈亏或涨跌幅代替。",
+                  "quantity 和 lastPrice 是导入更关键的字段；如果截图有市值和现价但没有数量，可用 市值 ÷ 现价 推算数量，并在 note 或 warnings 说明。",
                   "market 只能是 usStock、hkStock、cnStock、fund、crypto、cash。",
                   "currency 只能是 USD、HKD、CNY、SGD。",
+                  "A 股、同花顺、华宝证券等国内券商：中文股票名在第一列，列名可能是 市值、成本/现价、当日盈亏、盈亏；第一列下方数字常是市值，不是数量。",
+                  "港股价格带 HK$ 或界面标记“深港/沪港”时 currency 通常是 HKD，market 用 hkStock；A 股代码 6 位且无 HK$ 时 market 用 cnStock、currency 用 CNY。",
+                  "IBKR/Interactive Brokers：Instrument 是标的，Last 是现价，Position 是数量，MKT VAL/Mkt Val 是总市值；成本价常常不在截图中，应返回 averageCost:null。",
                   "visibility 使用用户默认值。",
                   "brokerName 识别券商或交易 App 名称，例如 富途、老虎、Interactive Brokers；未知时返回空字符串。",
                   "accountName 识别账户类型、账户名、账号尾号或截图中的账户标签；未知时返回空字符串。",
@@ -162,6 +169,7 @@ async function parseWithOpenAI({ text, imageURL, visibility, brokerHint, locale 
                   "accountKey 不要包含文件名、截图序号、时间、持仓标的或会随截图变化的内容。",
                   "如果截图列名是“市值/数量”，同一行上方数字是市值，下方数字是数量。",
                   "如果截图列名是“现价/成本”，同一行上方数字是现价 lastPrice，下方数字是持仓成本 averageCost。",
+                  "如果截图列名是“成本/现价”，同一行上方数字是 averageCost，下方数字是 lastPrice。",
                   "可用 市值 ÷ 数量 校验现价；不要把成本价和现价调换。",
                   "confidence 取 0 到 1，低于 0.7 的记录仍可返回，但要在 warnings 说明。"
                 ].join("\n")
@@ -323,28 +331,43 @@ function normalizeDrafts(drafts = [], fallbackVisibility, fallbackBrokerName = "
 }
 
 function normalizePriceAndCost({ quantity, averageCost, lastPrice, marketValue }) {
+  let normalizedQuantity = quantity;
+  let normalizedLastPrice = lastPrice;
+
+  if (normalizedQuantity === null && marketValue !== null && normalizedLastPrice !== null && normalizedLastPrice > 0) {
+    normalizedQuantity = roundImportNumber(marketValue / normalizedLastPrice);
+  }
+
+  if (normalizedLastPrice === null && marketValue !== null && normalizedQuantity !== null && normalizedQuantity > 0) {
+    normalizedLastPrice = roundImportNumber(marketValue / normalizedQuantity);
+  }
+
   if (
-    quantity
+    normalizedQuantity
     && marketValue
     && averageCost !== null
-    && lastPrice !== null
-    && pricesAreClose(marketValue / quantity, averageCost)
-    && !pricesAreClose(marketValue / quantity, lastPrice)
+    && normalizedLastPrice !== null
+    && pricesAreClose(marketValue / normalizedQuantity, averageCost)
+    && !pricesAreClose(marketValue / normalizedQuantity, normalizedLastPrice)
   ) {
     return {
-      quantity,
-      averageCost: lastPrice,
+      quantity: normalizedQuantity,
+      averageCost: normalizedLastPrice,
       lastPrice: averageCost,
       marketValue
     };
   }
 
   return {
-    quantity,
+    quantity: normalizedQuantity,
     averageCost,
-    lastPrice,
+    lastPrice: normalizedLastPrice,
     marketValue
   };
+}
+
+function roundImportNumber(value) {
+  return Math.round(Number(value) * 1000000) / 1000000;
 }
 
 function pricesAreClose(first, second) {
