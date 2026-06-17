@@ -22,6 +22,9 @@ const importSchema = {
           marketValue: { type: ["number", "null"] },
           currency: { type: "string", enum: Array.from(holdingCurrencies) },
           visibility: { type: "string", enum: Array.from(positionVisibilities) },
+          brokerName: { type: "string" },
+          accountName: { type: "string" },
+          accountKey: { type: "string" },
           confidence: { type: "number" },
           note: { type: "string" },
           rawText: { type: "string" }
@@ -36,6 +39,9 @@ const importSchema = {
           "marketValue",
           "currency",
           "visibility",
+          "brokerName",
+          "accountName",
+          "accountKey",
           "confidence",
           "note",
           "rawText"
@@ -73,7 +79,7 @@ export async function parseScreenshotImport({
       const parsed = await parseWithOpenAI({ text, imageURL, visibility, brokerHint, locale });
       return {
         source: "model",
-        holdings: normalizeDrafts(parsed.holdings, visibility),
+        holdings: normalizeDrafts(parsed.holdings, visibility, brokerHint),
         warnings: parsed.warnings ?? []
       };
     } catch (error) {
@@ -149,6 +155,11 @@ async function parseWithOpenAI({ text, imageURL, visibility, brokerHint, locale 
                   "market 只能是 usStock、hkStock、cnStock、fund、crypto、cash。",
                   "currency 只能是 USD、HKD、CNY、SGD。",
                   "visibility 使用用户默认值。",
+                  "brokerName 识别券商或交易 App 名称，例如 富途、老虎、Interactive Brokers；未知时返回空字符串。",
+                  "accountName 识别账户类型、账户名、账号尾号或截图中的账户标签；未知时返回空字符串。",
+                  "accountKey 用来判断多张截图是否来自同一个券商账户：优先使用 券商+账户尾号/账户类型；没有账户信息时使用券商或 App 界面名；未知时返回空字符串。",
+                  "同一个券商账户的分页或重复截图必须使用相同 accountKey；不同券商界面必须使用不同 accountKey。",
+                  "accountKey 不要包含文件名、截图序号、时间、持仓标的或会随截图变化的内容。",
                   "如果截图列名是“市值/数量”，同一行上方数字是市值，下方数字是数量。",
                   "如果截图列名是“现价/成本”，同一行上方数字是现价 lastPrice，下方数字是持仓成本 averageCost。",
                   "可用 市值 ÷ 数量 校验现价；不要把成本价和现价调换。",
@@ -267,7 +278,7 @@ function contextForSymbol(lines, startIndex) {
   return contextLines.join(" ");
 }
 
-function normalizeDrafts(drafts = [], fallbackVisibility) {
+function normalizeDrafts(drafts = [], fallbackVisibility, fallbackBrokerName = "") {
   return drafts
     .map((draft) => {
       const symbol = cleanSymbol(draft.symbol);
@@ -280,6 +291,9 @@ function normalizeDrafts(drafts = [], fallbackVisibility) {
         ? draft.currency
         : currencyFromText(draft.rawText ?? "", symbol);
       const visibility = positionVisibilities.has(draft.visibility) ? draft.visibility : fallbackVisibility;
+      const brokerName = cleanString(draft.brokerName) || cleanString(fallbackBrokerName);
+      const accountName = cleanString(draft.accountName);
+      const accountKey = cleanAccountKey(draft.accountKey || [brokerName, accountName].filter(Boolean).join(":"));
       const normalizedPrices = normalizePriceAndCost({
         quantity: optionalPositive(draft.quantity),
         averageCost: optionalNonNegative(draft.averageCost),
@@ -297,6 +311,9 @@ function normalizeDrafts(drafts = [], fallbackVisibility) {
         marketValue: normalizedPrices.marketValue,
         currency,
         visibility,
+        brokerName,
+        accountName,
+        accountKey,
         confidence: clamp(Number(draft.confidence), 0, 1) || 0.4,
         note: cleanString(draft.note),
         rawText: cleanString(draft.rawText)
@@ -383,6 +400,12 @@ function cleanImageDataURL(value) {
 
 function cleanString(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function cleanAccountKey(value) {
+  return cleanString(value)
+    .replace(/\s+/g, " ")
+    .slice(0, 80);
 }
 
 function cleanSymbol(value) {

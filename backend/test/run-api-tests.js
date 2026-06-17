@@ -197,6 +197,9 @@ async function correctsModelPriceCostOrderFromMarketValue() {
           marketValue: 20295,
           currency: "USD",
           visibility: "amountOnly",
+          brokerName: "富途",
+          accountName: "保证金账户 8381",
+          accountKey: "富途:保证金账户 8381",
           confidence: 0.95,
           note: "",
           rawText: "谷歌-A GOOGL 20,295.00 55 369.00 385.473 -19.25"
@@ -221,6 +224,8 @@ async function correctsModelPriceCostOrderFromMarketValue() {
     assert.equal(parsed.source, "model");
     assert.equal(parsed.holdings[0].lastPrice, 369);
     assert.equal(parsed.holdings[0].averageCost, 385.473);
+    assert.equal(parsed.holdings[0].brokerName, "富途");
+    assert.equal(parsed.holdings[0].accountKey, "富途:保证金账户 8381");
   } finally {
     globalThis.fetch = previousFetch;
     if (previousKey) {

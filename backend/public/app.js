@@ -721,13 +721,13 @@ function screenshotImportHTML() {
       <div class="two-col form-grid">
         ${selectHTML("defaultVisibility", "默认可见性", "amountOnly", visibilities())}
         <div class="field">
-          <label for="brokerHint">券商</label>
-          <input id="brokerHint" name="brokerHint" value="富途">
+          <label for="brokerHint">券商提示（可选）</label>
+          <input id="brokerHint" name="brokerHint" placeholder="可留空，模型会自动判断">
         </div>
       </div>
       <label class="file-drop">
         <span class="file-drop-title">选择持仓截图</span>
-        <span class="subtle">可一次选择多张截图，适合多券商或分页持仓；解析后会合并为一次完整提交。</span>
+        <span class="subtle">可一次选择多张截图；同券商账户按同代码覆盖，不同券商账户按同代码累计。</span>
         <input name="images" type="file" accept="image/*" multiple required>
       </label>
       <button class="primary-button" type="submit" ${state.busy ? "disabled" : ""}>解析截图</button>
@@ -764,11 +764,23 @@ function draftMetaHTML() {
     return "";
   }
 
+  const mergeCopy = draftMergeSummary(meta);
   return `
     <div class="subtle">
-      已解析 ${meta.fileCount} 张截图，识别 ${meta.rawCount} 条，合并后 ${meta.mergedCount} 条${meta.duplicateCount ? `，覆盖重复 ${meta.duplicateCount} 条` : ""}
+      已解析 ${meta.fileCount} 张截图，识别 ${meta.rawCount} 条，合并后 ${meta.mergedCount} 条${mergeCopy ? `，${mergeCopy}` : ""}
     </div>
   `;
+}
+
+function draftMergeSummary(meta) {
+  const parts = [];
+  if (meta.replacedCount) {
+    parts.push(`同账户覆盖 ${meta.replacedCount} 条`);
+  }
+  if (meta.accumulatedCount) {
+    parts.push(`跨券商累计 ${meta.accumulatedCount} 次`);
+  }
+  return parts.join("，");
 }
 
 function draftWarningsHTML() {
@@ -841,6 +853,7 @@ function holdingHTML(holding, options = {}) {
 
 function holdingDraftHTML(draft) {
   const complete = draft.quantity !== null && draft.averageCost !== null && draft.lastPrice !== null;
+  const sourceLabel = draftSourceLabel(draft);
   return `
     <article class="list-item">
       <div class="holding-row">
@@ -851,6 +864,7 @@ function holdingDraftHTML(draft) {
             <span>${escapeHTML(labelForMarket(draft.market))}</span>
             ${sourceCurrencyHTML(draft.currency)}
             <span>${Math.round(Number(draft.confidence ?? 0) * 100)}%</span>
+            ${sourceLabel ? `<span>${escapeHTML(sourceLabel)}</span>` : ""}
           </div>
         </div>
         <span class="pill ${complete ? "green" : "red"}">${complete ? "可导入" : "需核对"}</span>
@@ -1180,6 +1194,7 @@ async function parseScreenshot(formData, form) {
   await runBusy(async () => {
     const parsed = [];
     const warnings = [];
+    const brokerHint = String(formData.get("brokerHint") ?? "").trim();
 
     for (const [index, file] of files.entries()) {
       const imageDataURL = await imageFileToDataURL(file);
@@ -1188,7 +1203,7 @@ async function parseScreenshot(formData, form) {
         body: {
           imageDataURL,
           defaultVisibility: formData.get("defaultVisibility"),
-          brokerHint: formData.get("brokerHint"),
+          brokerHint,
           locale: navigator.language || "zh-Hans"
         }
       });
@@ -1197,7 +1212,9 @@ async function parseScreenshot(formData, form) {
       parsed.push(...holdings.map((draft) => ({
         ...draft,
         importSource: file.name || `截图 ${index + 1}`,
-        importIndex: index + 1
+        importIndex: index + 1,
+        importSourceType: result.source || "unknown",
+        importBrokerHint: brokerHint
       })));
 
       for (const warning of result.warnings ?? []) {
@@ -1212,6 +1229,8 @@ async function parseScreenshot(formData, form) {
       rawCount: parsed.length,
       mergedCount: merged.drafts.length,
       duplicateCount: merged.duplicateCount,
+      replacedCount: merged.replacedCount,
+      accumulatedCount: merged.accumulatedCount,
       warnings
     };
 
@@ -1223,8 +1242,8 @@ async function parseScreenshot(formData, form) {
 }
 
 function mergeDrafts(drafts) {
-  const bySymbol = new Map();
-  let duplicateCount = 0;
+  const byAccount = new Map();
+  let replacedCount = 0;
 
   for (const draft of drafts) {
     const symbol = normalizeSymbol(draft.symbol);
@@ -1232,25 +1251,155 @@ function mergeDrafts(drafts) {
       continue;
     }
 
-    if (bySymbol.has(symbol)) {
-      duplicateCount += 1;
-    }
-
-    bySymbol.set(symbol, {
+    const normalizedDraft = {
       ...draft,
       symbol,
-      note: mergedDraftNote(draft, bySymbol.get(symbol))
-    });
+      accountKey: draftAccountKey(draft),
+      brokerName: cleanDraftText(draft.brokerName),
+      accountName: cleanDraftText(draft.accountName)
+    };
+    const accountKey = `${symbol}|${normalizedDraft.accountKey}`;
+
+    if (byAccount.has(accountKey)) {
+      replacedCount += 1;
+    }
+
+    byAccount.set(accountKey, replaceDraft(byAccount.get(accountKey), normalizedDraft));
+  }
+
+  const bySymbol = new Map();
+  let accumulatedCount = 0;
+
+  for (const draft of byAccount.values()) {
+    if (bySymbol.has(draft.symbol)) {
+      accumulatedCount += 1;
+      bySymbol.set(draft.symbol, accumulateDrafts(bySymbol.get(draft.symbol), draft));
+      continue;
+    }
+
+    bySymbol.set(draft.symbol, draft);
   }
 
   return {
     drafts: Array.from(bySymbol.values()).sort((first, second) => first.symbol.localeCompare(second.symbol)),
-    duplicateCount
+    duplicateCount: replacedCount + accumulatedCount,
+    replacedCount,
+    accumulatedCount
   };
 }
 
 function normalizeSymbol(symbol) {
   return String(symbol ?? "").trim().toUpperCase();
+}
+
+function draftAccountKey(draft) {
+  const explicitKey = normalizeSourceKey(draft.accountKey);
+  if (explicitKey) {
+    return explicitKey;
+  }
+
+  const brokerKey = normalizeSourceKey(draft.brokerName);
+  const accountKey = normalizeSourceKey(draft.accountName);
+  if (brokerKey || accountKey) {
+    return [brokerKey, accountKey].filter(Boolean).join(":");
+  }
+
+  return `screenshot-${draft.importIndex || "unknown"}`;
+}
+
+function normalizeSourceKey(value) {
+  return cleanDraftText(value)
+    .toLocaleLowerCase()
+    .replace(/[|]/g, " ")
+    .trim();
+}
+
+function cleanDraftText(value) {
+  return String(value ?? "").trim().replace(/\s+/g, " ");
+}
+
+function replaceDraft(previousDraft, nextDraft) {
+  if (!previousDraft) {
+    return {
+      ...nextDraft,
+      note: mergedDraftNote(nextDraft)
+    };
+  }
+
+  return {
+    ...nextDraft,
+    brokerName: nextDraft.brokerName || previousDraft.brokerName,
+    accountName: nextDraft.accountName || previousDraft.accountName,
+    importSource: joinUnique([previousDraft.importSource, nextDraft.importSource]),
+    note: mergedDraftNote(nextDraft, previousDraft)
+  };
+}
+
+function accumulateDrafts(previousDraft, nextDraft) {
+  const previousQuantity = finiteNumber(previousDraft.quantity);
+  const nextQuantity = finiteNumber(nextDraft.quantity);
+  const quantity = sumNumbers(previousQuantity, nextQuantity);
+  const previousMarketValue = finiteNumber(previousDraft.marketValue);
+  const nextMarketValue = finiteNumber(nextDraft.marketValue);
+
+  return {
+    ...previousDraft,
+    assetName: previousDraft.assetName || nextDraft.assetName || previousDraft.symbol,
+    market: previousDraft.market || nextDraft.market,
+    quantity,
+    averageCost: weightedAverageCost(previousDraft, nextDraft, previousQuantity, nextQuantity),
+    lastPrice: finiteNumber(nextDraft.lastPrice) ?? finiteNumber(previousDraft.lastPrice),
+    marketValue: sumNumbers(previousMarketValue, nextMarketValue),
+    currency: previousDraft.currency || nextDraft.currency || "USD",
+    visibility: previousDraft.visibility || nextDraft.visibility || "amountOnly",
+    confidence: Math.min(Number(previousDraft.confidence ?? 1), Number(nextDraft.confidence ?? 1)),
+    note: accumulatedDraftNote(previousDraft, nextDraft),
+    rawText: joinUnique([previousDraft.rawText, nextDraft.rawText], "\n"),
+    importSource: joinUnique([previousDraft.importSource, nextDraft.importSource]),
+    brokerName: joinUnique([previousDraft.brokerName, nextDraft.brokerName]),
+    accountName: joinUnique([previousDraft.accountName, nextDraft.accountName]),
+    accountKey: joinUnique([previousDraft.accountKey, nextDraft.accountKey], "+")
+  };
+}
+
+function finiteNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function sumNumbers(first, second) {
+  if (first === null) {
+    return second;
+  }
+  if (second === null) {
+    return first;
+  }
+  return roundNumber(first + second);
+}
+
+function weightedAverageCost(previousDraft, nextDraft, previousQuantity, nextQuantity) {
+  const previousCost = finiteNumber(previousDraft.averageCost);
+  const nextCost = finiteNumber(nextDraft.averageCost);
+  if (
+    previousQuantity !== null
+    && nextQuantity !== null
+    && previousCost !== null
+    && nextCost !== null
+    && previousQuantity + nextQuantity > 0
+  ) {
+    return roundNumber(((previousQuantity * previousCost) + (nextQuantity * nextCost)) / (previousQuantity + nextQuantity));
+  }
+
+  return nextCost ?? previousCost;
+}
+
+function roundNumber(value) {
+  return Math.round(Number(value) * 1000000) / 1000000;
+}
+
+function accumulatedDraftNote(previousDraft, nextDraft) {
+  const sourceLabel = joinUnique([draftSourceLabel(previousDraft), draftSourceLabel(nextDraft)]);
+  return sourceLabel ? `多券商累计：${sourceLabel}` : "多券商累计";
 }
 
 function mergedDraftNote(nextDraft, previousDraft) {
@@ -1259,6 +1408,25 @@ function mergedDraftNote(nextDraft, previousDraft) {
     return nextDraft.note || source;
   }
   return nextDraft.note || source || previousDraft.note || "多截图合并";
+}
+
+function draftSourceLabel(draft) {
+  const account = [draft.brokerName, draft.accountName].map(cleanDraftText).filter(Boolean).join(" ");
+  return account || cleanDraftText(draft.accountKey) || cleanDraftText(draft.importSource);
+}
+
+function joinUnique(values, separator = "、") {
+  const seen = new Set();
+  const uniqueValues = [];
+  for (const value of values) {
+    const text = cleanDraftText(value);
+    if (!text || seen.has(text)) {
+      continue;
+    }
+    seen.add(text);
+    uniqueValues.push(text);
+  }
+  return uniqueValues.join(separator);
 }
 
 async function importDrafts() {
