@@ -154,6 +154,8 @@ async function parseWithOpenAI({ text, imageURL, visibility, brokerHint, locale 
                   "只提取股票、ETF、基金、现金、加密资产等真实持仓行；忽略总资产、今日盈亏、广告、按钮和导航文案。",
                   "暂不支持期权合约：Interactive Brokers 等截图中带有 Call、Put、到期日、行权价的期权行不要作为股票持仓返回。",
                   "字段不确定时用 null，不要编造数量、成本或现价。",
+                  "如果截图没有显示股票代码，或者股票名称被省略/截断，必须使用 web_search 在线查询补全代码和完整名称；优先查交易所、券商、权威财经网站。",
+                  "联网查询能唯一确认时，symbol 填股票代码，assetName 填完整名称；没有唯一结果时也必须返回持仓，symbol 暂用截图中的可见名称，assetName 用可见名称，并在 note 或 warnings 标记“缺少股票代码，需人工确认”。",
                   "averageCost 成本价不是必填；截图没有成本价时必须返回 null，不要用现价、盈亏或涨跌幅代替。",
                   "quantity 和 lastPrice 是导入更关键的字段；如果截图有市值和现价但没有数量，可用 市值 ÷ 现价 推算数量，并在 note 或 warnings 说明。",
                   "market 只能是 usStock、hkStock、cnStock、fund、crypto、cash。",
@@ -181,6 +183,8 @@ async function parseWithOpenAI({ text, imageURL, visibility, brokerHint, locale 
             content: userContent
           }
         ],
+        tools: [{ type: "web_search" }],
+        tool_choice: "auto",
         text: {
           format: {
             type: "json_schema",
@@ -432,10 +436,14 @@ function cleanAccountKey(value) {
 }
 
 function cleanSymbol(value) {
-  return cleanString(value)
+  const text = cleanString(value)
     .replace(/^(HK|US|SH|SZ)\./i, "")
-    .replace(/[^A-Za-z0-9.-]/g, "")
-    .toUpperCase();
+    .trim();
+  const asciiSymbol = text.replace(/[^A-Za-z0-9.-]/g, "").toUpperCase();
+  if (asciiSymbol) {
+    return asciiSymbol;
+  }
+  return text.replace(/\s+/g, "").slice(0, 32);
 }
 
 function symbolFromLine(line) {

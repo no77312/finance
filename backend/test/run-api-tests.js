@@ -249,24 +249,24 @@ async function parsesImageModelDraftWithoutAverageCost() {
       output_text: JSON.stringify({
         holdings: [
           {
-            symbol: "SNDK",
-            assetName: "SanDisk",
-            market: "usStock",
-            quantity: 131,
+            symbol: "雅迪控股",
+            assetName: "雅迪控股",
+            market: "hkStock",
+            quantity: 1725.6,
             averageCost: null,
-            lastPrice: 1248.55,
-            marketValue: 163560.05,
-            currency: "USD",
+            lastPrice: 10.75,
+            marketValue: 18550.2,
+            currency: "HKD",
             visibility: "amountOnly",
-            brokerName: "Interactive Brokers",
-            accountName: "Portfolio All",
-            accountKey: "Interactive Brokers:Portfolio All",
+            brokerName: "华宝证券",
+            accountName: "**1473",
+            accountKey: "华宝证券:**1473",
             confidence: 0.9,
-            note: "截图未展示成本价",
-            rawText: "SNDK Last 1248.55 Position 131"
+            note: "截图未展示股票代码和成本价",
+            rawText: "雅迪控股 市值 18,550.20 成本/现价 HK$11.641 HK$10.750"
           }
         ],
-        warnings: ["SNDK 缺少成本价，已留空。"]
+        warnings: ["雅迪控股缺少股票代码，需人工确认。"]
       })
     }), {
       status: 200,
@@ -283,11 +283,13 @@ async function parsesImageModelDraftWithoutAverageCost() {
 
     const userContent = requestBody.input.find((item) => item.role === "user").content;
     assert.ok(userContent.some((item) => item.type === "input_image"));
+    assert.ok(requestBody.tools.some((tool) => tool.type === "web_search"));
+    assert.equal(requestBody.tool_choice, "auto");
     assert.equal(parsed.source, "model");
-    assert.equal(parsed.holdings[0].symbol, "SNDK");
+    assert.equal(parsed.holdings[0].symbol, "雅迪控股");
     assert.equal(parsed.holdings[0].averageCost, null);
-    assert.equal(parsed.holdings[0].lastPrice, 1248.55);
-    assert.ok(parsed.warnings.some((warning) => warning.includes("成本价")));
+    assert.equal(parsed.holdings[0].lastPrice, 10.75);
+    assert.ok(parsed.warnings.some((warning) => warning.includes("股票代码")));
   } finally {
     globalThis.fetch = previousFetch;
     if (previousKey) {
