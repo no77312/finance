@@ -1077,27 +1077,24 @@ function holdingStatsHTML({
       value: formatNumber(holding.quantity)
     },
     {
+      label: "成本",
+      value: showCost ? money(convertMoneyToUSD(holding.averageCost, holding.currency), "USD") : "不可见"
+    },
+    {
       label: "现价",
       value: money(convertMoneyToUSD(holding.lastPrice, holding.currency), "USD")
-    }
+    },
+    showCost
+      ? {
+          label: "盈亏",
+          value: signedMoney(pnl, "USD"),
+          tone: classForNumber(pnl)
+        }
+      : {
+          label: "市值",
+          value: money(marketValue, "USD")
+        }
   ];
-
-  if (showCost) {
-    stats.splice(1, 0, {
-      label: "成本",
-      value: money(convertMoneyToUSD(holding.averageCost, holding.currency), "USD")
-    });
-    stats.push({
-      label: "盈亏",
-      value: signedMoney(pnl, "USD"),
-      tone: classForNumber(pnl)
-    });
-  } else {
-    stats.push({
-      label: "市值",
-      value: money(marketValue, "USD")
-    });
-  }
 
   return `
     <div class="holding-stat-grid">
@@ -1107,13 +1104,8 @@ function holdingStatsHTML({
           <div class="holding-stat-value ${escapeAttr(stat.tone || "")}">${escapeHTML(stat.value)}</div>
         </div>
       `).join("")}
-      ${holding.priceDate ? `
-        <div class="holding-stat">
-          <div class="holding-stat-label">价格日期</div>
-          <div class="holding-stat-value">${escapeHTML(holding.priceDate)}</div>
-        </div>
-      ` : ""}
     </div>
+    ${holding.priceDate ? `<div class="holding-stat-note">价格日期 ${escapeHTML(holding.priceDate)}</div>` : ""}
     ${showCost ? "" : `<div class="holding-hidden-note">这条持仓隐藏了成本价，占比仅按当前可见市值计算。</div>`}
   `;
 }

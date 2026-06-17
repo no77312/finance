@@ -501,7 +501,7 @@ button.list-item.active {
 
 .holding-stat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -521,16 +521,23 @@ button.list-item.active {
 }
 
 .holding-stat-value {
-  font-size: 17px;
+  font-size: 16px;
   line-height: 1.15;
   font-weight: 760;
   overflow-wrap: anywhere;
+}
+
+.holding-stat-note {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .holding-primary-value {
   font-size: 22px;
   line-height: 1.05;
   font-weight: 800;
+  white-space: nowrap;
 }
 
 .holding-hidden-note {
@@ -549,6 +556,7 @@ button.list-item.active {
 }
 
 .value-stack {
+  min-width: 0;
   display: grid;
   justify-items: end;
   gap: 2px;
@@ -1615,6 +1623,20 @@ button.list-item.active {
   .snapshot-highlight,
   .group-menu-item {
     grid-template-columns: 1fr;
+  }
+
+  .exposure-card .holding-card-head {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+  }
+
+  .exposure-card .value-stack {
+    justify-items: end;
+    text-align: right;
+  }
+
+  .exposure-card .holding-primary-value {
+    font-size: 20px;
   }
 
   .holding-card-side,
