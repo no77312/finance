@@ -239,6 +239,15 @@ function topbarHTML(activeGroup) {
     mine: "我的"
   }[state.activeTab] ?? "持仓圈";
 
+  if (state.activeTab === "overview") {
+    return `
+      <header class="topbar overview-topbar">
+        <div class="topbar-center-title">${escapeHTML(tabLabel)}</div>
+        <button class="topbar-round-button" type="button" data-action="sheet" data-value="groups" aria-label="群组">...</button>
+      </header>
+    `;
+  }
+
   return `
     <header class="topbar">
       <div class="topbar-row">
@@ -281,36 +290,12 @@ function overviewHTML(group) {
   const consensusExposures = exposureRows(holdings)
     .filter((exposure) => exposure.holderCount > 1);
   const exposures = consensusExposures.slice(0, 8);
-  const snapshots = recentSnapshotSummaries(group.id).slice(0, 6);
 
   return `
-    <main class="content overview-layout">
-      <section class="section">
-        ${overviewDashboardHTML(group, holdings, consensusExposures)}
-        <div class="section-header">
-          <div class="section-header-copy">
-            <h2 class="section-title">共识标的</h2>
-            <div class="subtle">只展示 2 位及以上成员同时持有的标的</div>
-          </div>
-          <span class="subtle">${exposures.length} 项</span>
-        </div>
-        <div class="list">
-          ${exposures.length ? exposures.map(exposureHTML).join("") : `<div class="empty">目前还没有多人同时持有的公开标的。</div>`}
-        </div>
-      </section>
+    <main class="content overview-layout overview-screen">
+      ${overviewDashboardHTML(group, holdings, consensusExposures)}
+      ${overviewConsensusSectionHTML(exposures, holdings)}
       ${overviewMembersSectionHTML(group)}
-      <section class="section section-wide">
-        <div class="section-header">
-          <div class="section-header-copy">
-            <h2 class="section-title">最近更新</h2>
-            <div class="subtle">按每次提交展示仓位占比变化</div>
-          </div>
-          <button class="primary-button" type="button" data-action="sheet" data-value="submit">提交持仓</button>
-        </div>
-        <div class="list">
-          ${snapshots.length ? snapshots.map(snapshotUpdateHTML).join("") : `<div class="empty">还没有成员提交持仓。</div>`}
-        </div>
-      </section>
     </main>
   `;
 }
@@ -403,45 +388,49 @@ function overviewDashboardHTML(group, holdings, consensusExposures) {
   const visibleHoldings = holdings.filter((holding) => canSeeValues(holding));
   const latestSnapshotAt = groupLatestSnapshotAt(group.id);
   const signals = groupSignalRows(group, holdings, consensusExposures);
-  const marketRows = groupMarketRows(visibleHoldings).slice(0, 4);
+  const marketRows = groupMarketRows(visibleHoldings).slice(0, 3);
 
   return `
     <div class="panel group-overview-panel">
-      <div class="overview-heading compact">
+      <h2 class="overview-panel-title">群组概况</h2>
+      <div class="overview-group-head">
+        <div class="overview-group-icon">${overviewGlyph("users")}</div>
         <div class="min-w-0">
-          <div class="topbar-label">群组概况</div>
-          <h2 class="section-title">${escapeHTML(group.name)}</h2>
-          <div class="subtle">${escapeHTML(group.subtitle || "共享持仓与观点")}</div>
+          <div class="overview-group-name">${escapeHTML(group.name)}</div>
+          <div class="overview-group-meta">${members.length}位成员 · USD折算</div>
         </div>
         ${group.inviteCode
-          ? `<button class="pill blue pill-button invite-button" type="button" data-action="copy-invite" data-value="${escapeAttr(group.inviteCode)}">邀请码 <strong>${escapeHTML(group.inviteCode)}</strong></button>`
+          ? `<button class="overview-invite-button" type="button" data-action="copy-invite" data-value="${escapeAttr(group.inviteCode)}">${escapeHTML(group.inviteCode)} ${overviewGlyph("copy")}</button>`
           : ""}
+        <span class="overview-chevron" aria-hidden="true">&rsaquo;</span>
       </div>
       <div class="overview-kpi-row">
-        ${overviewKPIHTML("已提交", `${contributingIDs.size}/${members.length || 0}`)}
-        ${overviewKPIHTML("可见市值", money(summary.marketValue, "USD"))}
-        ${overviewKPIHTML("共识标的", `${consensusExposures.length}`)}
-        ${overviewKPIHTML("最近更新", latestSnapshotAt ? formatDateTime(latestSnapshotAt) : "等待提交")}
+        ${overviewKPIHTML("已提交", `${contributingIDs.size}/${members.length || 0}`, "check", "green")}
+        ${overviewKPIHTML("可见市值", money(summary.marketValue, "USD"), "dollar", "blue")}
+        ${overviewKPIHTML("共识标的", `${consensusExposures.length}`, "target", "purple")}
+        ${overviewKPIHTML("更新", latestSnapshotAt ? formatDateTime(latestSnapshotAt) : "等待提交", "clock", "orange")}
       </div>
+      <div class="overview-divider"></div>
+      <h3 class="overview-subtitle">核心信号</h3>
       <div class="overview-signal-list">
         ${signals.map(signalRowHTML).join("")}
       </div>
       <div class="overview-market-row">
-        <span class="overview-market-label">市场分布</span>
+        <h3 class="overview-subtitle">市场分布</h3>
         <div class="overview-market-chips">
           ${marketRows.length
-            ? marketRows.map((row, index) => `<span class="legend-chip tone-${index % 6}"><strong>${escapeHTML(row.label)}</strong><span>${escapeHTML(formatPercent(row.weight))}</span></span>`).join("")
-            : `<span class="legend-chip">暂无可见仓位</span>`}
+            ? marketRows.map((row, index) => marketChipHTML(row, index)).join("")
+            : `<span class="overview-market-chip">暂无可见仓位</span>`}
         </div>
       </div>
     </div>
   `;
 }
 
-function overviewKPIHTML(label, value) {
+function overviewKPIHTML(label, value, iconName, tone) {
   return `
-    <div class="overview-kpi">
-      <span>${escapeHTML(label)}</span>
+    <div class="overview-kpi overview-tone-${escapeAttr(tone)}">
+      <span>${overviewGlyph(iconName)}${escapeHTML(label)}</span>
       <strong>${escapeHTML(value)}</strong>
     </div>
   `;
@@ -462,27 +451,34 @@ function groupSignalRows(group, holdings, consensusExposures) {
     .slice(0, 3)
     .reduce((sum, exposure) => sum + (totalVisibleValue > 0 ? exposure.marketValue / totalVisibleValue : 0), 0);
   const activeMembers = membersWithRecentSnapshots(group.id, 24);
+  const timeline = groupActivityTimeline(group.id, 5);
 
   return [
     {
       label: "共识强度",
       value: formatPercent(consensusStrength),
-      detail: consensusExposures.length ? `${consensusExposures.length} 个多人持有标的` : "等待形成共同持仓",
+      detail: "持有人数 ≥2 的标的占比",
+      icon: "users",
+      tone: "green",
       progress: consensusStrength,
       avatars: consensusMembers
     },
     {
       label: "集中度 Top3",
       value: formatPercent(top3Weight),
-      detail: topSymbols.slice(0, 3).map((item) => item.symbol).join(" / ") || "暂无可见仓位",
-      segments: topSymbols
+      detail: "前3大持仓占比",
+      icon: "pie",
+      tone: "blue",
+      segments: topSymbols,
+      chevron: true
     },
     {
       label: "活跃度",
-      value: activeMembers.length ? `${activeMembers.length} 人` : "暂无",
-      detail: activeMembers.length ? "最近 24 小时有提交" : "最近 24 小时暂无提交",
-      dots: Math.min(Math.max(activeMembers.length, 0), 5),
-      avatars: activeMembers
+      value: activeMembers.length ? `${activeMembers.length}人今日更新` : "今日暂无",
+      detail: activeMembers.length ? `${activeMembers.length}人今日更新` : "等待成员更新",
+      icon: "bolt",
+      tone: "orange",
+      timeline
     }
   ];
 }
@@ -490,32 +486,39 @@ function groupSignalRows(group, holdings, consensusExposures) {
 function signalRowHTML(signal) {
   return `
     <div class="overview-signal-row">
+      <div class="overview-signal-icon overview-tone-${escapeAttr(signal.tone)}">${overviewGlyph(signal.icon)}</div>
       <div class="overview-signal-copy min-w-0">
-        <div class="overview-signal-label">${escapeHTML(signal.label)}</div>
+        <div class="overview-signal-label">${escapeHTML(signal.label)} <span class="overview-info">i</span></div>
         <div class="overview-signal-detail">${escapeHTML(signal.detail)}</div>
       </div>
-      <div class="overview-signal-visual">
-        <div class="overview-signal-value">${escapeHTML(signal.value)}</div>
-        ${signal.segments ? miniAllocationHTML(signal.segments, "overview-signal-strip") : signal.dots !== undefined ? activityDotsHTML(signal.dots) : compactProgressHTML(signal.progress)}
+      <div class="overview-signal-visual${signal.avatars?.length ? " has-avatars" : ""}">
+        ${signal.timeline ? "" : `<div class="overview-signal-value">${escapeHTML(signal.value)}</div>`}
+        ${signal.segments ? miniAllocationHTML(signal.segments, "overview-signal-strip") : signal.timeline ? activityTimelineHTML(signal.timeline) : compactProgressHTML(signal.progress, signal.tone)}
         ${signal.avatars?.length ? avatarStackHTML(signal.avatars, 4) : ""}
       </div>
+      ${signal.chevron ? `<span class="overview-row-chevron" aria-hidden="true">&rsaquo;</span>` : ""}
     </div>
   `;
 }
 
-function activityDotsHTML(activeCount) {
+function activityTimelineHTML(items) {
   return `
-    <div class="activity-dots" aria-hidden="true">
-      ${Array.from({ length: 5 }, (_, index) => `<span class="${index < activeCount ? "active" : ""}"></span>`).join("")}
+    <div class="activity-timeline" aria-hidden="true">
+      ${items.map((item) => `
+        <span class="activity-point ${item.active ? "active" : ""}">
+          <span></span>
+          <small>${escapeHTML(item.label)}</small>
+        </span>
+      `).join("")}
     </div>
   `;
 }
 
-function compactProgressHTML(value = 0) {
+function compactProgressHTML(value = 0, tone = "blue") {
   const width = Math.max(0, Math.min(Number(value) || 0, 1)) * 100;
   return `
     <div class="compact-progress" aria-hidden="true">
-      <div class="compact-progress-fill" style="width: ${width}%;"></div>
+      <div class="compact-progress-fill overview-tone-${escapeAttr(tone)}" style="width: ${width}%;"></div>
     </div>
   `;
 }
@@ -540,6 +543,35 @@ function membersWithRecentSnapshots(groupID, hours = 24) {
     .filter(Boolean);
 }
 
+function groupActivityTimeline(groupID, days = 5) {
+  const activeDays = new Set(groupSnapshots(groupID).map((snapshot) => dayKey(snapshot.createdAt)));
+  const today = new Date();
+  return Array.from({ length: days }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() - (days - 1 - index));
+    return {
+      label: formatMonthDay(date),
+      active: activeDays.has(dayKey(date))
+    };
+  });
+}
+
+function dayKey(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return [date.getFullYear(), date.getMonth() + 1, date.getDate()].join("-");
+}
+
+function formatMonthDay(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return `${date.getMonth() + 1}/${date.getDate()}`;
+}
+
 function groupMarketRows(holdings) {
   const total = holdings.reduce((sum, holding) => sum + holdingMarketValueUSD(holding), 0);
   const grouped = new Map();
@@ -556,6 +588,98 @@ function groupMarketRows(holdings) {
       weight: total > 0 ? marketValue / total : 0
     }))
     .sort((first, second) => second.marketValue - first.marketValue);
+}
+
+function marketChipHTML(row, index) {
+  return `
+    <span class="overview-market-chip tone-${index % 6}">
+      <span class="overview-market-icon">${escapeHTML(marketShortLabel(row.market))}</span>
+      <span>${escapeHTML(row.label)}</span>
+      <strong>${escapeHTML(formatPercent(row.weight))}</strong>
+    </span>
+  `;
+}
+
+function marketShortLabel(market) {
+  return {
+    usStock: "US",
+    hkStock: "HK",
+    cnStock: "A",
+    fund: "ETF",
+    crypto: "₿",
+    cash: "$"
+  }[market] ?? "USD";
+}
+
+function overviewConsensusSectionHTML(exposures, holdings) {
+  const totalVisibleValue = holdings
+    .filter((holding) => canSeeValues(holding))
+    .reduce((sum, holding) => sum + holdingMarketValueUSD(holding), 0);
+
+  return `
+    <section class="panel overview-section-card">
+      <div class="overview-section-head">
+        <h2 class="overview-section-title">共识标的</h2>
+        <span class="overview-section-more">${exposures.length}只 <span aria-hidden="true">&rsaquo;</span></span>
+      </div>
+      <div class="overview-horizontal-scroll consensus-scroll">
+        ${exposures.length
+          ? exposures.slice(0, 4).map((exposure) => overviewConsensusCardHTML(exposure, totalVisibleValue)).join("")
+          : `<div class="overview-empty-card">暂无共识标的</div>`}
+        ${exposures.length > 4 ? `<div class="overview-see-all-card">查看全部 <span aria-hidden="true">&rsaquo;</span></div>` : ""}
+      </div>
+      <div class="overview-carousel-dots" aria-hidden="true">
+        <span class="active"></span><span></span><span></span><span></span><span></span>
+      </div>
+    </section>
+  `;
+}
+
+function overviewConsensusCardHTML(exposure, totalVisibleValue) {
+  const weight = totalVisibleValue > 0 ? exposure.marketValue / totalVisibleValue : 0;
+  return `
+    <button class="overview-consensus-card" type="button" data-action="tab" data-value="members">
+      ${symbolLogoHTML(exposure.symbol)}
+      <strong>${escapeHTML(exposure.symbol)}</strong>
+      <span>${exposure.holderCount}人持有</span>
+      <em>${escapeHTML(formatPercent(weight))}</em>
+    </button>
+  `;
+}
+
+function overviewMembersSectionHTML(group) {
+  const members = group.members ?? [];
+  return `
+    <section class="panel overview-section-card member-composition-panel">
+      <div class="overview-section-head">
+        <h2 class="overview-section-title">成员组合</h2>
+        <span class="overview-sort-control">按可见市值⌄</span>
+      </div>
+      <div class="overview-horizontal-scroll member-composition-scroll">
+        ${members.map((member) => overviewMemberCompositionCardHTML(member, group.id)).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function overviewMemberCompositionCardHTML(member, groupID) {
+  const holdings = groupHoldings(groupID).filter((holding) => holding.ownerID === member.id);
+  const insights = buildPortfolioInsights(groupID, member.id, holdings);
+  const summary = visibleSummary(holdings);
+  const primaryValue = memberPrimaryValue(summary, holdings, insights);
+
+  return `
+    <button class="overview-member-card" type="button" data-action="open-member" data-value="${escapeAttr(member.id)}">
+      <div class="overview-member-head">
+        ${avatarHTML(member)}
+        <div class="min-w-0">
+          <strong>${escapeHTML(member.displayName)}</strong>
+          <span>${escapeHTML(primaryValue)}</span>
+        </div>
+      </div>
+      <div class="overview-donut" style="${escapeAttr(donutStyle(insights.topSlices))}"></div>
+    </button>
+  `;
 }
 
 function portfolioSectionHTML(group, ownerID, options = {}) {
@@ -580,21 +704,6 @@ function portfolioSectionHTML(group, ownerID, options = {}) {
             portfolio: insights.statsByHoldingID.get(holding.id)
           })).join("")
           : `<div class="empty">${options.editable ? "你还没有在这个群组提交持仓。" : "这个成员还没有提交持仓。"}</div>`}
-      </div>
-    </section>
-  `;
-}
-
-function overviewMembersSectionHTML(group) {
-  const members = group.members ?? [];
-  return `
-    <section class="section">
-      <div class="section-header">
-        <h2 class="section-title">成员组合</h2>
-        <span class="subtle">${members.length} 人</span>
-      </div>
-      <div class="member-overview-grid">
-        ${members.map((member) => memberOverviewCardHTML(member, group.id)).join("")}
       </div>
     </section>
   `;
@@ -2621,6 +2730,55 @@ function miniAvatarHTML(user) {
   return pictureURL
     ? `<span class="mini-avatar"><img src="${escapeAttr(pictureURL)}" alt=""></span>`
     : `<span class="mini-avatar">${escapeHTML(name.trim().slice(0, 1) || "持")}</span>`;
+}
+
+function symbolLogoHTML(symbol) {
+  const normalized = normalizeSymbol(symbol);
+  const known = {
+    AAPL: ["apple", "black"],
+    MSFT: ["m", "microsoft"],
+    NVDA: ["n", "nvidia"],
+    GOOGL: ["g", "google"],
+    GOOG: ["g", "google"],
+    "00700": ["700", "blue"],
+    "0700": ["700", "blue"],
+    VOO: ["V", "blue"]
+  }[normalized];
+  const [label, tone] = known ?? [normalized.slice(0, 2) || "股", "blue"];
+  return `<span class="symbol-logo symbol-logo-${escapeAttr(tone)}">${escapeHTML(label)}</span>`;
+}
+
+function donutStyle(slices) {
+  if (!slices.length) {
+    return "background: #edf0f5;";
+  }
+
+  const colors = ["#0a84ff", "#34c759", "#ff9f0a", "#5e5ce6", "#ff375f", "#64d2ff"];
+  let cursor = 0;
+  const segments = slices.slice(0, 6).map((slice, index) => {
+    const start = cursor;
+    const next = Math.min(1, cursor + Math.max(0, Number(slice.weight) || 0));
+    cursor = next;
+    return `${colors[index % colors.length]} ${Math.round(start * 100)}% ${Math.round(next * 100)}%`;
+  });
+  if (cursor < 1) {
+    segments.push(`#edf0f5 ${Math.round(cursor * 100)}% 100%`);
+  }
+  return `background: conic-gradient(${segments.join(", ")});`;
+}
+
+function overviewGlyph(name) {
+  const paths = {
+    users: `<path d="M8 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm8-1a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM3 20a5 5 0 0 1 10 0M12 19a4.5 4.5 0 0 1 7.5 0" />`,
+    check: `<path d="M20 6 9 17l-5-5" />`,
+    dollar: `<path d="M12 3v18M16 7.5c-.7-1-2-1.5-3.6-1.5-2 0-3.4.9-3.4 2.4 0 3.6 7.5 1.5 7.5 5.7 0 1.7-1.6 2.9-4.1 2.9-1.9 0-3.4-.6-4.4-1.9" />`,
+    target: `<path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-4a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0-4a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" />`,
+    clock: `<path d="M12 8v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />`,
+    copy: `<path d="M8 8h10v10H8z" /><path d="M6 16H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />`,
+    pie: `<path d="M12 3v9h9A9 9 0 1 1 12 3Z" /><path d="M15 3.5A9 9 0 0 1 20.5 9H15Z" />`,
+    bolt: `<path d="m13 2-8 12h6l-1 8 8-12h-6l1-8Z" />`
+  };
+  return `<svg class="overview-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] ?? ""}</svg>`;
 }
 
 function icon(name) {
