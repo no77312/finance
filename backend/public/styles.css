@@ -457,6 +457,7 @@ button.list-item.active {
   font-size: 18px;
   line-height: 1.1;
   font-weight: 800;
+  white-space: nowrap;
 }
 
 .member-list-strip {
@@ -561,6 +562,11 @@ button.list-item.active {
   justify-items: end;
   gap: 2px;
   text-align: right;
+}
+
+.member-row .value-stack,
+.member-overview-head .value-stack {
+  min-width: max-content;
 }
 
 .weight-value {
@@ -866,6 +872,7 @@ button.list-item.active {
   font-size: 22px;
   line-height: 1.05;
   font-weight: 800;
+  white-space: nowrap;
 }
 
 .member-allocation-strip {
@@ -1636,6 +1643,15 @@ button.list-item.active {
   }
 
   .exposure-card .holding-primary-value {
+    font-size: 20px;
+  }
+
+  .member-overview-card .value-stack {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .member-overview-value {
     font-size: 20px;
   }
 
