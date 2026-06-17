@@ -56,6 +56,37 @@ const importSchema = {
   required: ["holdings", "warnings"]
 };
 
+const securityCompletionSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    completions: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          id: { type: "number" },
+          symbol: { type: "string" },
+          assetName: { type: "string" },
+          market: { type: "string", enum: Array.from(assetMarkets) },
+          currency: { type: "string", enum: Array.from(holdingCurrencies) },
+          confidence: { type: "number" },
+          note: { type: "string" }
+        },
+        required: ["id", "symbol", "assetName", "market", "currency", "confidence", "note"]
+      }
+    },
+    warnings: {
+      type: "array",
+      items: { type: "string" }
+    }
+  },
+  required: ["completions", "warnings"]
+};
+
+const AMOUNT_SOURCE = "(?:HK\\$|US\\$|S\\$|[$¥]|USD|HKD|CNY|SGD)?\\s*([-+]?\\d[\\d,]*(?:\\.\\d+)?\\s*[Kk万]?)";
+
 export async function parseScreenshotImport({
   ocrText,
   imageDataURL = "",
@@ -77,10 +108,11 @@ export async function parseScreenshotImport({
   if (process.env.OPENAI_API_KEY) {
     try {
       const parsed = await parseWithOpenAI({ text, imageURL, visibility, brokerHint, locale });
+      const holdings = normalizeDrafts(parsed.holdings, visibility, brokerHint);
       return {
         source: "model",
-        holdings: normalizeDrafts(parsed.holdings, visibility, brokerHint),
-        warnings: parsed.warnings ?? []
+        holdings,
+        warnings: normalizeModelWarnings(parsed.warnings ?? [], holdings)
       };
     } catch (error) {
       const fallback = parseWithRules({ text, visibility, hasModelKey: true });
@@ -107,7 +139,7 @@ export async function parseScreenshotImport({
 
 async function parseWithOpenAI({ text, imageURL, visibility, brokerHint, locale }) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25000);
+  const timeout = setTimeout(() => controller.abort(), 45000);
   const userContent = [
     {
       type: "input_text",
@@ -154,10 +186,7 @@ async function parseWithOpenAI({ text, imageURL, visibility, brokerHint, locale 
                   "只提取股票、ETF、基金、现金、加密资产等真实持仓行；忽略总资产、今日盈亏、广告、按钮和导航文案。",
                   "暂不支持期权合约：Interactive Brokers 等截图中带有 Call、Put、到期日、行权价的期权行不要作为股票持仓返回。",
                   "字段不确定时用 null，不要编造数量、成本或现价。",
-                  "如果截图没有显示股票代码，或者股票名称被省略/截断，必须使用 web_search 在线查询补全代码和完整名称；对每个缺代码/名称截断的持仓逐一查询“股票名 股票代码 交易所”。",
-                  "优先查交易所、券商、权威财经网站；港股优先返回 5 位数字代码，A 股优先返回 6 位数字代码，美股优先返回 ticker。",
-                  "联网查询能唯一确认时，symbol 填股票代码，assetName 填完整名称；没有唯一结果时也必须返回持仓，symbol 暂用截图中的可见名称，assetName 用可见名称，并在 note 或 warnings 标记“缺少股票代码，需人工确认”。",
-                  "联网搜索只用于补全证券代码和完整名称；数量、现价、成本价、市值必须优先来自截图，不能因为搜索到代码就丢掉截图里的数字。",
+                  "如果截图没有显示股票代码，或者股票名称被省略/截断，也必须返回该持仓；symbol 暂用截图中的可见名称，assetName 用可见名称，并在 note 标记需要补全。",
                   "averageCost 成本价不是必填；截图没有成本价时必须返回 null，不要用现价、盈亏或涨跌幅代替。",
                   "quantity 和 lastPrice 是导入更关键的字段；如果截图有市值和现价但没有数量，可用 市值 ÷ 现价 推算数量，并在 note 或 warnings 说明。",
                   "market 只能是 usStock、hkStock、cnStock、fund、crypto、cash。",
@@ -187,8 +216,6 @@ async function parseWithOpenAI({ text, imageURL, visibility, brokerHint, locale 
             content: userContent
           }
         ],
-        tools: [{ type: "web_search" }],
-        tool_choice: "required",
         text: {
           format: {
             type: "json_schema",
@@ -210,9 +237,113 @@ async function parseWithOpenAI({ text, imageURL, visibility, brokerHint, locale 
     if (!outputText) {
       throw new Error("OpenAI response did not contain text output.");
     }
-    return JSON.parse(outputText);
+    const parsed = JSON.parse(outputText);
+    return await completeMissingSecurityIdentities(parsed, { brokerHint, locale, signal: controller.signal });
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+async function completeMissingSecurityIdentities(parsed, { brokerHint, locale, signal }) {
+  const holdings = Array.isArray(parsed.holdings) ? parsed.holdings : [];
+  const candidates = holdings
+    .map((draft, index) => ({ draft, index }))
+    .filter(({ draft }) => needsSecurityCompletion(draft))
+    .slice(0, 25);
+
+  if (candidates.length === 0) {
+    return parsed;
+  }
+
+  try {
+    const response = await fetch(OPENAI_RESPONSES_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      signal,
+      body: JSON.stringify({
+        model: process.env.OPENAI_MODEL || DEFAULT_MODEL,
+        store: false,
+        temperature: 0,
+        max_output_tokens: 2500,
+        input: [
+          {
+            role: "system",
+            content: [
+              {
+                type: "input_text",
+                text: [
+                  "你是证券代码补全器。只输出符合 schema 的 JSON。",
+                  "必须使用 web_search 对每个 item 查询证券代码和完整名称。",
+                  "只补全身份字段：symbol、assetName、market、currency；不要改变数量、成本、现价、市值。",
+                  "优先查交易所、券商、权威财经网站；结合 brokerHint、market、currency、rawText 判断市场。",
+                  "港股优先返回 5 位数字代码，A 股优先返回 6 位数字代码，美股优先返回 ticker。",
+                  "如果无法唯一确认，原样返回可见名称，并在 note 说明需要人工确认。"
+                ].join("\n")
+              }
+            ]
+          },
+          {
+            role: "user",
+            content: [
+              {
+                type: "input_text",
+                text: [
+                  `语言环境：${locale}`,
+                  `券商提示：${brokerHint || "未知"}`,
+                  "待补全持仓：",
+                  JSON.stringify(candidates.map(({ draft, index }) => ({
+                    id: index,
+                    visibleSymbol: cleanString(draft.symbol),
+                    visibleName: cleanString(draft.assetName),
+                    market: cleanString(draft.market),
+                    currency: cleanString(draft.currency),
+                    rawText: cleanString(draft.rawText).slice(0, 500)
+                  })), null, 2)
+                ].join("\n")
+              }
+            ]
+          }
+        ],
+        tools: [{ type: "web_search" }],
+        tool_choice: "required",
+        text: {
+          format: {
+            type: "json_schema",
+            name: "security_identity_completion",
+            strict: true,
+            schema: securityCompletionSchema
+          }
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const message = await openAIErrorMessage(response);
+      throw new Error(`OpenAI returned ${response.status}${message ? `: ${message}` : ""}`);
+    }
+
+    const data = await response.json();
+    const outputText = extractOutputText(data);
+    if (!outputText) {
+      throw new Error("OpenAI response did not contain security completion text output.");
+    }
+
+    const completion = JSON.parse(outputText);
+    return {
+      holdings: applySecurityCompletions(holdings, completion.completions),
+      warnings: [...(parsed.warnings ?? []), ...(completion.warnings ?? [])]
+    };
+  } catch (error) {
+    return {
+      ...parsed,
+      warnings: [
+        ...(parsed.warnings ?? []),
+        `证券代码联网补全暂不可用，请在确认页核对。${openAIErrorSummary(error)}`
+      ]
+    };
   }
 }
 
@@ -310,11 +441,12 @@ function normalizeDrafts(drafts = [], fallbackVisibility, fallbackBrokerName = "
       const brokerName = cleanString(draft.brokerName) || cleanString(fallbackBrokerName);
       const accountName = cleanString(draft.accountName);
       const accountKey = cleanAccountKey(draft.accountKey || [brokerName, accountName].filter(Boolean).join(":"));
+      const rawNumbers = inferNumbersFromRawText(draft.rawText);
       const normalizedPrices = normalizePriceAndCost({
-        quantity: optionalPositive(draft.quantity),
-        averageCost: optionalNonNegative(draft.averageCost),
-        lastPrice: optionalNonNegative(draft.lastPrice),
-        marketValue: optionalNonNegative(draft.marketValue)
+        quantity: optionalPositive(draft.quantity) ?? rawNumbers.quantity,
+        averageCost: optionalNonNegative(draft.averageCost) ?? rawNumbers.averageCost,
+        lastPrice: optionalNonNegative(draft.lastPrice) ?? rawNumbers.lastPrice,
+        marketValue: optionalNonNegative(draft.marketValue) ?? rawNumbers.marketValue
       });
 
       return {
@@ -336,6 +468,128 @@ function normalizeDrafts(drafts = [], fallbackVisibility, fallbackBrokerName = "
       };
     })
     .filter(Boolean);
+}
+
+function applySecurityCompletions(drafts, completions = []) {
+  const byID = new Map();
+  for (const completion of completions) {
+    const id = Number(completion.id);
+    if (Number.isInteger(id)) {
+      byID.set(id, completion);
+    }
+  }
+
+  return drafts.map((draft, index) => {
+    const completion = byID.get(index);
+    if (!completion || clamp(Number(completion.confidence), 0, 1) < 0.55) {
+      return draft;
+    }
+
+    const completedSymbol = cleanSymbol(completion.symbol);
+    const completedName = cleanString(completion.assetName);
+    const completedMarket = assetMarkets.has(completion.market) ? completion.market : draft.market;
+    const completedCurrency = holdingCurrencies.has(completion.currency) ? completion.currency : draft.currency;
+
+    return {
+      ...draft,
+      symbol: completedSymbol || draft.symbol,
+      assetName: shouldUseCompletedName(completedName, draft.assetName) ? completedName : draft.assetName,
+      market: completedMarket,
+      currency: completedCurrency,
+      note: mergeNotes(draft.note, completion.note)
+    };
+  });
+}
+
+function needsSecurityCompletion(draft) {
+  const symbol = cleanString(draft.symbol);
+  const assetName = cleanString(draft.assetName);
+  const combined = `${symbol} ${assetName}`;
+  if (draft.market === "cash" || draft.market === "crypto" || /现金|CASH/i.test(combined)) {
+    return false;
+  }
+  return !isRecognizedSecuritySymbol(symbol) || isProbablyTruncated(symbol) || isProbablyTruncated(assetName);
+}
+
+function isRecognizedSecuritySymbol(symbol) {
+  const cleaned = cleanSymbol(symbol);
+  return /^[A-Z]{1,5}(?:\.[A-Z]{1,3})?$/.test(cleaned) || /^\d{4,6}$/.test(cleaned);
+}
+
+function isProbablyTruncated(value) {
+  return /\.{2,}|…/.test(cleanString(value));
+}
+
+function shouldUseCompletedName(completedName, currentName) {
+  const current = cleanString(currentName);
+  if (!completedName) {
+    return false;
+  }
+  return !current || isProbablyTruncated(current) || completedName.length > current.length;
+}
+
+function mergeNotes(first, second) {
+  const notes = [cleanString(first), cleanString(second)].filter(Boolean);
+  return Array.from(new Set(notes)).join("；");
+}
+
+function inferNumbersFromRawText(rawText) {
+  const text = cleanString(rawText).replace(/\s+/g, " ");
+  const result = {
+    quantity: null,
+    averageCost: null,
+    lastPrice: null,
+    marketValue: null
+  };
+
+  if (!text) {
+    return result;
+  }
+
+  const valueQuantityMatch = text.match(new RegExp(`市值\\s*[\\/／]\\s*数量\\s*${AMOUNT_SOURCE}\\s*(?:[\\/／]|\\s+)\\s*${AMOUNT_SOURCE}`, "i"));
+  if (valueQuantityMatch) {
+    result.marketValue = positiveNumberFromMatch(valueQuantityMatch, 1);
+    result.quantity = positiveNumberFromMatch(valueQuantityMatch, 2);
+  }
+
+  const marketValueMatch = text.match(new RegExp(`(?:市值|MKT\\s*VAL|MARKET\\s*VALUE|Mkt\\s*Val)\\s*[:：]?\\s*${AMOUNT_SOURCE}`, "i"));
+  if (result.marketValue === null && marketValueMatch) {
+    result.marketValue = positiveNumberFromMatch(marketValueMatch, 1);
+  }
+
+  const valueBeforeCostPriceMatch = text.match(new RegExp(`${AMOUNT_SOURCE}\\s*(?:成本\\s*[\\/／]\\s*现价|现价\\s*[\\/／]\\s*成本)`, "i"));
+  if (result.marketValue === null && valueBeforeCostPriceMatch) {
+    result.marketValue = positiveNumberFromMatch(valueBeforeCostPriceMatch, 1);
+  }
+
+  const costPriceMatch = text.match(new RegExp(`成本\\s*[\\/／]\\s*现价\\s*${AMOUNT_SOURCE}\\s*(?:[\\/／]|\\s+)\\s*${AMOUNT_SOURCE}`, "i"));
+  if (costPriceMatch) {
+    result.averageCost = positiveNumberFromMatch(costPriceMatch, 1);
+    result.lastPrice = positiveNumberFromMatch(costPriceMatch, 2);
+  }
+
+  const priceCostMatch = text.match(new RegExp(`现价\\s*[\\/／]\\s*成本\\s*${AMOUNT_SOURCE}\\s*(?:[\\/／]|\\s+)\\s*${AMOUNT_SOURCE}`, "i"));
+  if (priceCostMatch) {
+    result.lastPrice = result.lastPrice ?? positiveNumberFromMatch(priceCostMatch, 1);
+    result.averageCost = result.averageCost ?? positiveNumberFromMatch(priceCostMatch, 2);
+  }
+
+  const lastPriceMatch = text.match(new RegExp(`(?:Last|现价|最新价)\\s*[:：]?\\s*${AMOUNT_SOURCE}`, "i"));
+  if (result.lastPrice === null && lastPriceMatch) {
+    result.lastPrice = positiveNumberFromMatch(lastPriceMatch, 1);
+  }
+
+  const quantityMatch = text.match(new RegExp(`(?:数量|Position|Shares)\\s*[:：]?\\s*${AMOUNT_SOURCE}`, "i"));
+  if (result.quantity === null && quantityMatch) {
+    result.quantity = positiveNumberFromMatch(quantityMatch, 1);
+  }
+
+  return result;
+}
+
+function positiveNumberFromMatch(match, index) {
+  const value = parseCompactNumber(match[index]);
+  return value !== null && value > 0 ? value : null;
 }
 
 function normalizePriceAndCost({ quantity, averageCost, lastPrice, marketValue }) {
@@ -394,6 +648,21 @@ function dedupeDrafts(drafts) {
     seen.add(key);
     return true;
   });
+}
+
+function normalizeModelWarnings(warnings, holdings) {
+  const hasRecoveredNumbers = holdings.length > 0
+    && holdings.every((holding) => holding.lastPrice !== null && (holding.quantity !== null || holding.marketValue !== null));
+
+  return warnings
+    .map((warning) => cleanString(warning))
+    .filter(Boolean)
+    .filter((warning) => {
+      if (hasRecoveredNumbers && /缺少.*(?:数量|现价|市值)/.test(warning)) {
+        return false;
+      }
+      return true;
+    });
 }
 
 function extractOutputText(data) {

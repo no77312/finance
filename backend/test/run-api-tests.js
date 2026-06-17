@@ -241,10 +241,33 @@ async function parsesImageModelDraftWithoutAverageCost() {
   const previousFetch = globalThis.fetch;
   const previousKey = process.env.OPENAI_API_KEY;
   process.env.OPENAI_API_KEY = "test-key";
-  let requestBody = null;
+  const requestBodies = [];
 
   globalThis.fetch = async (_url, options) => {
-    requestBody = JSON.parse(options.body);
+    const requestBody = JSON.parse(options.body);
+    requestBodies.push(requestBody);
+    if (requestBodies.length === 2) {
+      return new Response(JSON.stringify({
+        output_text: JSON.stringify({
+          completions: [
+            {
+              id: 0,
+              symbol: "01585",
+              assetName: "雅迪控股",
+              market: "hkStock",
+              currency: "HKD",
+              confidence: 0.95,
+              note: "已联网补全港股代码"
+            }
+          ],
+          warnings: []
+        })
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
     return new Response(JSON.stringify({
       output_text: JSON.stringify({
         holdings: [
@@ -253,20 +276,20 @@ async function parsesImageModelDraftWithoutAverageCost() {
             assetName: "雅迪控股",
             market: "hkStock",
             quantity: null,
-            averageCost: 11.641,
-            lastPrice: 10.75,
-            marketValue: 18550.2,
+            averageCost: null,
+            lastPrice: null,
+            marketValue: null,
             currency: "HKD",
             visibility: "amountOnly",
             brokerName: "华宝证券",
             accountName: "**1473",
             accountKey: "华宝证券:**1473",
             confidence: 0.9,
-            note: "截图未展示股票代码和成本价",
-            rawText: "雅迪控股 市值 18,550.20 成本/现价 HK$11.641 HK$10.750"
+            note: "截图未展示股票代码",
+            rawText: "雅迪控股 18,550.20\n成本/现价\nHK$11.641 / HK$10.750"
           }
         ],
-        warnings: ["雅迪控股缺少股票代码，需人工确认。"]
+        warnings: ["缺少数量、成本价、现价和市值，需人工确认。"]
       })
     }), {
       status: 200,
@@ -278,19 +301,21 @@ async function parsesImageModelDraftWithoutAverageCost() {
     const parsed = await parseScreenshotImport({
       defaultVisibility: "amountOnly",
       imageDataURL: "data:image/png;base64,AAAA",
-      brokerHint: "IBKR"
+      brokerHint: "华宝证券"
     });
 
+    const requestBody = requestBodies[0];
     const userContent = requestBody.input.find((item) => item.role === "user").content;
     assert.ok(userContent.some((item) => item.type === "input_image"));
-    assert.ok(requestBody.tools.some((tool) => tool.type === "web_search"));
-    assert.equal(requestBody.tool_choice, "required");
+    assert.equal(requestBodies.length, 2);
+    assert.ok(requestBodies[1].tools.some((tool) => tool.type === "web_search"));
+    assert.equal(requestBodies[1].tool_choice, "required");
     assert.equal(parsed.source, "model");
-    assert.equal(parsed.holdings[0].symbol, "雅迪控股");
+    assert.equal(parsed.holdings[0].symbol, "01585");
     assert.equal(parsed.holdings[0].quantity, 1725.6);
     assert.equal(parsed.holdings[0].averageCost, 11.641);
     assert.equal(parsed.holdings[0].lastPrice, 10.75);
-    assert.ok(parsed.warnings.some((warning) => warning.includes("股票代码")));
+    assert.ok(!parsed.warnings.some((warning) => warning.includes("缺少数量")));
   } finally {
     globalThis.fetch = previousFetch;
     if (previousKey) {
