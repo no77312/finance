@@ -252,8 +252,8 @@ async function parsesImageModelDraftWithoutAverageCost() {
             symbol: "雅迪控股",
             assetName: "雅迪控股",
             market: "hkStock",
-            quantity: 1725.6,
-            averageCost: null,
+            quantity: null,
+            averageCost: 11.641,
             lastPrice: 10.75,
             marketValue: 18550.2,
             currency: "HKD",
@@ -287,7 +287,8 @@ async function parsesImageModelDraftWithoutAverageCost() {
     assert.equal(requestBody.tool_choice, "auto");
     assert.equal(parsed.source, "model");
     assert.equal(parsed.holdings[0].symbol, "雅迪控股");
-    assert.equal(parsed.holdings[0].averageCost, null);
+    assert.equal(parsed.holdings[0].quantity, 1725.6);
+    assert.equal(parsed.holdings[0].averageCost, 11.641);
     assert.equal(parsed.holdings[0].lastPrice, 10.75);
     assert.ok(parsed.warnings.some((warning) => warning.includes("股票代码")));
   } finally {
