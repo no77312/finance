@@ -154,7 +154,8 @@ async function parseWithOpenAI({ text, imageURL, visibility, brokerHint, locale 
                   "只提取股票、ETF、基金、现金、加密资产等真实持仓行；忽略总资产、今日盈亏、广告、按钮和导航文案。",
                   "暂不支持期权合约：Interactive Brokers 等截图中带有 Call、Put、到期日、行权价的期权行不要作为股票持仓返回。",
                   "字段不确定时用 null，不要编造数量、成本或现价。",
-                  "如果截图没有显示股票代码，或者股票名称被省略/截断，必须使用 web_search 在线查询补全代码和完整名称；优先查交易所、券商、权威财经网站。",
+                  "如果截图没有显示股票代码，或者股票名称被省略/截断，必须使用 web_search 在线查询补全代码和完整名称；对每个缺代码/名称截断的持仓逐一查询“股票名 股票代码 交易所”。",
+                  "优先查交易所、券商、权威财经网站；港股优先返回 5 位数字代码，A 股优先返回 6 位数字代码，美股优先返回 ticker。",
                   "联网查询能唯一确认时，symbol 填股票代码，assetName 填完整名称；没有唯一结果时也必须返回持仓，symbol 暂用截图中的可见名称，assetName 用可见名称，并在 note 或 warnings 标记“缺少股票代码，需人工确认”。",
                   "联网搜索只用于补全证券代码和完整名称；数量、现价、成本价、市值必须优先来自截图，不能因为搜索到代码就丢掉截图里的数字。",
                   "averageCost 成本价不是必填；截图没有成本价时必须返回 null，不要用现价、盈亏或涨跌幅代替。",
@@ -187,7 +188,7 @@ async function parseWithOpenAI({ text, imageURL, visibility, brokerHint, locale 
           }
         ],
         tools: [{ type: "web_search" }],
-        tool_choice: "auto",
+        tool_choice: "required",
         text: {
           format: {
             type: "json_schema",

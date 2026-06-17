@@ -284,7 +284,7 @@ async function parsesImageModelDraftWithoutAverageCost() {
     const userContent = requestBody.input.find((item) => item.role === "user").content;
     assert.ok(userContent.some((item) => item.type === "input_image"));
     assert.ok(requestBody.tools.some((tool) => tool.type === "web_search"));
-    assert.equal(requestBody.tool_choice, "auto");
+    assert.equal(requestBody.tool_choice, "required");
     assert.equal(parsed.source, "model");
     assert.equal(parsed.holdings[0].symbol, "雅迪控股");
     assert.equal(parsed.holdings[0].quantity, 1725.6);
