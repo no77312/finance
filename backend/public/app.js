@@ -1228,11 +1228,9 @@ function holdingHTML(holding, options = {}) {
   const pnl = showCost ? marketValue - costBasis : null;
   const portfolio = options.portfolio ?? null;
   const emphasizeWeight = Boolean(options.emphasizeWeight && portfolio);
-  const primaryValue = emphasizeWeight
-    ? weightHeadline(portfolio)
-    : (showValues ? money(marketValue, "USD") : "仅标的");
-  const secondaryValue = emphasizeWeight
-    ? (showValues ? money(marketValue, "USD") : "仅标的")
+  const primaryValue = showValues ? money(marketValue, "USD") : "仅标的";
+  const secondaryValue = emphasizeWeight && portfolio?.weight !== null
+    ? `占比 ${formatPercent(portfolio.weight)}`
     : (showValues ? "可见市值" : "金额不可见");
 
   return `
@@ -1245,14 +1243,12 @@ function holdingHTML(holding, options = {}) {
             <span>${escapeHTML(labelForMarket(holding.market))}</span>
             <span>${escapeHTML(owner?.displayName || "")}</span>
             ${sourceCurrencyHTML(holding.currency)}
+            ${privacyPillHTML(holding)}
           </div>
         </div>
-        <div class="holding-card-side">
-          ${privacyPillHTML(holding)}
-          <div class="value-stack">
-            <div class="${emphasizeWeight ? "weight-value" : "holding-primary-value"}">${escapeHTML(primaryValue)}</div>
-            <div class="value-caption">${escapeHTML(secondaryValue)}</div>
-          </div>
+        <div class="holding-card-price">
+          <strong>${escapeHTML(primaryValue)}</strong>
+          <span>${escapeHTML(secondaryValue)}</span>
         </div>
       </div>
       ${holdingStatsHTML({

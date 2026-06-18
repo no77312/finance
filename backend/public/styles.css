@@ -556,21 +556,38 @@ button.list-item.active {
 }
 
 .holding-card {
-  gap: 12px;
+  gap: 9px;
+  padding: 13px;
+  border-radius: 24px;
 }
 
 .holding-card-head {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
+  gap: 10px;
   align-items: start;
 }
 
-.holding-card-side {
-  min-width: 112px;
+.holding-card-price {
+  min-width: 104px;
   display: grid;
   justify-items: end;
-  gap: 8px;
+  gap: 2px;
+  text-align: right;
+}
+
+.holding-card-price strong {
+  font-size: 20px;
+  line-height: 1.05;
+  font-weight: 820;
+  white-space: nowrap;
+}
+
+.holding-card-price span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
 }
 
 .holding-meta,
@@ -585,17 +602,17 @@ button.list-item.active {
 
 .holding-stat-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .holding-stat {
   min-width: 0;
-  padding: 12px 14px;
-  border-radius: 20px;
+  padding: 8px 7px;
+  border-radius: 14px;
   background: var(--control);
   display: grid;
-  gap: 4px;
+  gap: 3px;
 }
 
 .holding-stat-label {
@@ -605,10 +622,12 @@ button.list-item.active {
 }
 
 .holding-stat-value {
-  font-size: 16px;
-  line-height: 1.15;
+  font-size: 15px;
+  line-height: 1.08;
   font-weight: 760;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .holding-stat-note {
@@ -1453,27 +1472,21 @@ button.list-item.active {
 .tabbar .tab-icon {
   width: 24px;
   height: 24px;
-  padding: 2px;
-  border-radius: 12px;
   transition:
     width 180ms var(--ease-standard),
     height 180ms var(--ease-standard),
-    padding 180ms var(--ease-standard),
-    background 180ms var(--ease-standard),
     color 180ms var(--ease-standard);
 }
 
 .tabbar button.active {
   color: var(--accent);
-  background: rgba(0, 122, 255, 0.07);
+  background: transparent;
 }
 
 .tabbar button.active .tab-icon {
-  width: 30px;
-  height: 30px;
-  padding: 5px;
-  background: var(--accent);
-  color: #ffffff;
+  width: 25px;
+  height: 25px;
+  color: var(--accent);
 }
 
 .sheet {
@@ -2205,7 +2218,6 @@ button.list-item.active {
     font-size: 17px;
   }
 
-  .holding-card-side,
   .snapshot-meta {
     justify-items: start;
     text-align: left;
