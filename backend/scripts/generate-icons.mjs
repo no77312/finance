@@ -7,44 +7,43 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const iconDir = join(root, "public", "icons");
 
 const segments = [
-  { start: -118, sweep: 144, color: [0, 122, 255], hex: "#007aff" },
-  { start: 34, sweep: 94, color: [52, 199, 89], hex: "#34c759" },
-  { start: 138, sweep: 66, color: [255, 159, 10], hex: "#ff9f0a" },
-  { start: 214, sweep: 48, color: [94, 92, 230], hex: "#5e5ce6" },
-  { start: 272, sweep: 32, color: [255, 55, 95], hex: "#ff375f" }
+  { start: -92, sweep: 142, color: [66, 133, 244], hex: "#4285f4" },
+  { start: 58, sweep: 118, color: [52, 168, 83], hex: "#34a853" },
+  { start: 184, sweep: 76, color: [251, 188, 5], hex: "#fbbc05" }
 ];
 
 function svgSource() {
   const paths = segments.map((segment) => {
     const end = segment.start + segment.sweep;
-    return `<path d="${arcPath(512, 512, 254, segment.start, end)}" fill="none" stroke="${segment.hex}" stroke-width="118" stroke-linecap="round"/>`;
-  }).join("\n    ");
-
-  const markers = [
-    `<rect x="458" y="142" width="108" height="58" rx="29" fill="#ffffff" opacity="0.92"/>`,
-    `<circle cx="734" cy="282" r="36" fill="#ffffff" opacity="0.92"/>`,
-    `<path d="M766 650l54 94H712z" fill="#ffffff" opacity="0.92"/>`
-  ].join("\n    ");
+    return `<path d="${arcPath(512, 512, 268, segment.start, end)}" fill="none" stroke="${segment.hex}" stroke-width="126" stroke-linecap="round"/>`;
+  }).join("\n      ");
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
   <defs>
     <linearGradient id="bg" x1="186" y1="94" x2="838" y2="930" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="1" stop-color="#f5f7fb"/>
+      <stop offset="1" stop-color="#f7f8fb"/>
     </linearGradient>
-    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="34" stdDeviation="32" flood-color="#111111" flood-opacity="0.12"/>
+    <radialGradient id="centerGlow" cx="50%" cy="38%" r="66%">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f3f6fb"/>
+    </radialGradient>
+    <filter id="surfaceShadow" x="-22%" y="-22%" width="144%" height="144%">
+      <feDropShadow dx="0" dy="30" stdDeviation="34" flood-color="#1f2937" flood-opacity="0.12"/>
+    </filter>
+    <filter id="colorShadow" x="-22%" y="-22%" width="144%" height="144%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#1f2937" flood-opacity="0.10"/>
     </filter>
   </defs>
   <rect width="1024" height="1024" rx="228" fill="url(#bg)"/>
-  <circle cx="512" cy="512" r="322" fill="#ffffff" filter="url(#softShadow)"/>
-  <g filter="url(#softShadow)">
-    ${paths}
-    <circle cx="512" cy="512" r="154" fill="#ffffff"/>
-    <circle cx="512" cy="512" r="92" fill="#111111"/>
-    <circle cx="512" cy="512" r="42" fill="#ffffff"/>
-    ${markers}
+  <circle cx="512" cy="512" r="336" fill="#ffffff" filter="url(#surfaceShadow)"/>
+  <circle cx="512" cy="512" r="318" fill="#f8fafc"/>
+  <g filter="url(#colorShadow)">
+      ${paths}
   </g>
+  <circle cx="512" cy="512" r="158" fill="url(#centerGlow)"/>
+  <circle cx="512" cy="512" r="158" fill="none" stroke="#e8edf5" stroke-width="10"/>
+  <circle cx="512" cy="512" r="64" fill="#ffffff" opacity="0.74"/>
 </svg>
 `;
 }
@@ -111,13 +110,22 @@ function sampleIcon(x, y) {
   const dy = py - 512;
   const distance = Math.hypot(dx, dy);
 
-  if (distance < 348) {
-    const shadow = Math.max(0, 1 - Math.abs(distance - 322) / 96) * 0.08;
+  if (distance < 366) {
+    const shadow = Math.max(0, 1 - Math.abs(distance - 336) / 104) * 0.08;
     color = blend(color, [0, 0, 0, shadow * 255]);
   }
 
-  if (distance < 322) {
+  if (distance < 336) {
     color = blend(color, [255, 255, 255, 255]);
+  }
+
+  if (distance < 318) {
+    color = blend(color, [248, 250, 252, 255]);
+  }
+
+  const ringShadow = Math.max(0, 1 - Math.abs(distance - 268) / 92) * 0.05;
+  if (ringShadow > 0) {
+    color = blend(color, [31, 41, 55, ringShadow * 255]);
   }
 
   for (const segment of segments) {
@@ -127,17 +135,17 @@ function sampleIcon(x, y) {
     }
   }
 
-  if (distance < 154) {
-    color = blend(color, [255, 255, 255, 255]);
+  if (distance < 163) {
+    color = blend(color, [232, 237, 245, 255]);
   }
-  if (distance < 92) {
-    color = blend(color, [17, 17, 17, 255]);
+  if (distance < 158) {
+    const center = mix([255, 255, 255], [243, 246, 251], Math.min(1, Math.max(0, (distance - 24) / 134)));
+    color = blend(color, [...center, 255]);
   }
-  if (distance < 42) {
-    color = blend(color, [255, 255, 255, 255]);
+  if (distance < 64) {
+    color = blend(color, [255, 255, 255, 189]);
   }
 
-  color = blend(color, markerColor(px, py));
   return color;
 }
 
@@ -152,8 +160,8 @@ function arcAlpha(x, y, segment) {
   const dx = x - 512;
   const dy = y - 512;
   const distance = Math.hypot(dx, dy);
-  const stroke = 118;
-  const radius = 254;
+  const stroke = 126;
+  const radius = 268;
   const radial = clamp((stroke / 2 + 0.7 - Math.abs(distance - radius)) / 1.4, 0, 1);
   if (radial <= 0) {
     return 0;

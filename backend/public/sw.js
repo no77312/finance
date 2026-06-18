@@ -1,4 +1,4 @@
-const CACHE_NAME = "position-circle-shell-v2";
+const CACHE_NAME = "position-circle-shell-v3";
 const SHELL_ASSETS = [
   "/",
   "/styles.css",
