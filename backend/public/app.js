@@ -1412,7 +1412,7 @@ function holdingStatsHTML({
   pnl
 }) {
   if (!showValues) {
-    return `<div class="holding-hidden-note">这条持仓仅公开标的，金额、仓位与盈亏不会展示。</div>`;
+    return `<div class="holding-hidden-note">仅公开标的，金额不可见。</div>`;
   }
 
   const stats = [
@@ -1450,7 +1450,7 @@ function holdingStatsHTML({
       `).join("")}
     </div>
     ${holding.priceDate ? `<div class="holding-stat-note">价格日期 ${escapeHTML(holding.priceDate)}</div>` : ""}
-    ${showCost ? "" : `<div class="holding-hidden-note">成本价缺失或未公开，盈亏暂不计算，占比按当前可见市值计算。</div>`}
+    ${showCost ? "" : `<div class="holding-hidden-note">成本缺失，盈亏暂不计。</div>`}
   `;
 }
 
@@ -3076,7 +3076,7 @@ function labelForMarket(value) {
 function privacyPillHTML(holding) {
   const label = Object.fromEntries(visibilities())[holding.visibility] ?? "完整可见";
   const color = holding.visibility === "full" ? "green" : holding.visibility === "amountOnly" ? "blue" : "";
-  return `<span class="pill ${color}">${escapeHTML(label)}</span>`;
+  return `<span class="pill privacy-pill ${color}">${escapeHTML(label)}</span>`;
 }
 
 function avatarHTML(user) {
@@ -3130,6 +3130,13 @@ function money(value, currency = "USD") {
   const number = Number(value);
   if (!Number.isFinite(number)) {
     return "-";
+  }
+  if (currency === "USD") {
+    const sign = number < 0 ? "-" : "";
+    const formatted = new Intl.NumberFormat("zh-CN", {
+      maximumFractionDigits: Math.abs(number) >= 100 ? 0 : 2
+    }).format(Math.abs(number));
+    return `${sign}$${formatted}`;
   }
   try {
     return new Intl.NumberFormat("zh-CN", {
