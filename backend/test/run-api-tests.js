@@ -50,6 +50,7 @@ async function main() {
     await correctsModelPriceCostOrderFromMarketValue();
     await parsesImageModelDraftWithoutAverageCost();
     await sanitizesInteractiveBrokersScreenshotDrafts();
+    await generatesGroupAdviceWithDailyCache();
     await signsInAndJoinsGroupByInviteCode();
     await signsInWithGoogleAndCreatesGroup();
     await createsGroupForSignedInUser();
@@ -113,6 +114,30 @@ async function signsInAndJoinsGroupByInviteCode() {
   assert.equal(bootstrap.currentMemberID, signedIn.currentMemberID);
   assert.equal(bootstrap.groups.length, 1);
   assert.equal(bootstrap.holdings.every((holding) => holding.groupID === groupID), true);
+}
+
+async function generatesGroupAdviceWithDailyCache() {
+  const previousKey = process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+
+  try {
+    const first = await getJson(`/api/groups/${groupID}/advice`);
+    assert.equal(first.cached, false);
+    assert.equal(typeof first.advice.headline, "string");
+    assert.ok(first.advice.summary.length > 0);
+    assert.ok(Array.isArray(first.advice.highlights));
+
+    const second = await getJson(`/api/groups/${groupID}/advice`);
+    assert.equal(second.cached, true);
+    assert.equal(second.generatedAt, first.generatedAt);
+    assert.deepEqual(second.advice, first.advice);
+  } finally {
+    if (previousKey) {
+      process.env.OPENAI_API_KEY = previousKey;
+    } else {
+      delete process.env.OPENAI_API_KEY;
+    }
+  }
 }
 
 async function signsInWithGoogleAndCreatesGroup() {

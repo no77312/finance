@@ -22,6 +22,7 @@ import {
   notFound,
   summariesByCurrency
 } from "./domain.js";
+import { generateGroupAdvice } from "./groupAdvice.js";
 import { parseScreenshotImport } from "./importParser.js";
 import { refreshHoldingsWithPreviousClose } from "./marketData.js";
 
@@ -89,6 +90,7 @@ async function routeRequest(request, response, store, context) {
         "POST /api/imports/parse-screenshot",
         "POST /api/admin/prices/refresh",
         "POST /api/groups/:groupID/prices/refresh",
+        "GET /api/groups/:groupID/advice",
         "GET /api/groups/:groupID/holding-events",
         "GET /api/groups/:groupID/holdings",
         "POST /api/groups/:groupID/holdings",
@@ -258,6 +260,54 @@ async function routeRequest(request, response, store, context) {
     });
   }
 
+  if (parts[3] === "advice" && request.method === "GET" && parts.length === 4) {
+    const memberID = requireMemberID(request);
+    const result = await store.update(async (data) => {
+      requireSessionForUser(data, memberID, request);
+      const group = requireGroupAccess(data, groupID, memberID);
+      data.groupAdvice ??= [];
+
+      const date = dayKey();
+      const existing = data.groupAdvice.find((record) => (
+        record.groupID === groupID
+        && record.memberID === memberID
+        && record.date === date
+      ));
+      if (existing) {
+        return {
+          advice: existing.advice,
+          generatedAt: existing.generatedAt,
+          date,
+          cached: true
+        };
+      }
+
+      const holdings = data.holdings.filter((holding) => holding.groupID === groupID);
+      const advice = await generateGroupAdvice({ group, holdings, requesterID: memberID });
+      const record = {
+        id: randomUUID().toUpperCase(),
+        groupID,
+        memberID,
+        date,
+        generatedAt: new Date().toISOString(),
+        advice
+      };
+      data.groupAdvice = data.groupAdvice
+        .filter((candidate) => !(candidate.groupID === groupID && candidate.memberID === memberID && candidate.date === date))
+        .concat(record)
+        .slice(-500);
+
+      return {
+        advice,
+        generatedAt: record.generatedAt,
+        date,
+        cached: false
+      };
+    });
+
+    return send(response, 200, result);
+  }
+
   if (parts[3] === "prices" && parts[4] === "refresh" && request.method === "POST" && parts.length === 5) {
     requirePriceRefreshToken(request);
 
@@ -271,6 +321,7 @@ async function routeRequest(request, response, store, context) {
       const refreshResult = await refreshHoldingsWithPreviousClose(groupHoldings);
       const refreshedByID = new Map(refreshResult.holdings.map((holding) => [holding.id, holding]));
       data.holdings = data.holdings.map((holding) => refreshedByID.get(holding.id) ?? holding);
+      invalidateGroupAdvice(data, groupID);
       return refreshResult;
     });
 
@@ -311,6 +362,7 @@ async function routeRequest(request, response, store, context) {
       appendHoldingEvent(data, event);
       const snapshot = createPortfolioSnapshot(data, groupID, memberID, "manual");
       appendPortfolioSnapshot(data, snapshot);
+      invalidateGroupAdvice(data, groupID);
       return {
         holding: nextHolding,
         event,
@@ -384,6 +436,7 @@ async function routeRequest(request, response, store, context) {
 
       const snapshot = createPortfolioSnapshot(data, groupID, memberID, "screenshot");
       appendPortfolioSnapshot(data, snapshot);
+      invalidateGroupAdvice(data, groupID);
 
       return {
         created,
@@ -423,6 +476,7 @@ async function routeRequest(request, response, store, context) {
       appendHoldingEvent(data, event);
       const snapshot = createPortfolioSnapshot(data, groupID, memberID, "manual");
       appendPortfolioSnapshot(data, snapshot);
+      invalidateGroupAdvice(data, groupID);
       return {
         holding: nextHolding,
         event,
@@ -450,6 +504,7 @@ async function routeRequest(request, response, store, context) {
       appendHoldingEvent(data, event);
       const snapshot = createPortfolioSnapshot(data, groupID, memberID, "manual");
       appendPortfolioSnapshot(data, snapshot);
+      invalidateGroupAdvice(data, groupID);
       return {
         event,
         snapshot
@@ -560,6 +615,7 @@ function removeGroupData(data, groupID) {
   data.holdings = (data.holdings ?? []).filter((holding) => holding.groupID !== groupID);
   data.holdingEvents = (data.holdingEvents ?? []).filter((event) => event.groupID !== groupID);
   data.portfolioSnapshots = (data.portfolioSnapshots ?? []).filter((snapshot) => snapshot.groupID !== groupID);
+  data.groupAdvice = (data.groupAdvice ?? []).filter((record) => record.groupID !== groupID);
 }
 
 function removeMemberGroupData(data, groupID, memberID) {
@@ -567,6 +623,25 @@ function removeMemberGroupData(data, groupID, memberID) {
   data.holdingEvents = (data.holdingEvents ?? []).filter((event) => !(event.groupID === groupID && event.ownerID === memberID));
   data.portfolioSnapshots = (data.portfolioSnapshots ?? [])
     .filter((snapshot) => !(snapshot.groupID === groupID && snapshot.ownerID === memberID));
+  data.groupAdvice = (data.groupAdvice ?? [])
+    .filter((record) => !(record.groupID === groupID && record.memberID === memberID));
+  invalidateGroupAdvice(data, groupID);
+}
+
+function invalidateGroupAdvice(data, groupID) {
+  data.groupAdvice = (data.groupAdvice ?? []).filter((record) => record.groupID !== groupID);
+}
+
+function dayKey(date = new Date()) {
+  const timeZone = process.env.APP_TIME_ZONE || "Asia/Shanghai";
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+  const valueByType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${valueByType.year}-${valueByType.month}-${valueByType.day}`;
 }
 
 function memberIDForRequest(request, body = {}) {

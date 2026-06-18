@@ -23,6 +23,9 @@ const state = {
   drafts: [],
   draftMeta: null,
   importProgress: null,
+  adviceByGroupID: {},
+  adviceLoadingGroupID: "",
+  adviceError: "",
   message: "",
   error: "",
   busy: false
@@ -65,6 +68,7 @@ function bindEvents() {
 
     if (action === "sign-out") {
       clearNotice();
+      state.sheet = "";
       clearSession();
       render();
       return;
@@ -81,6 +85,7 @@ function bindEvents() {
     if (action === "sheet") {
       state.sheet = value;
       state.manageGroupID = "";
+      state.adviceError = "";
       clearNotice();
       if (value === "submit") {
         state.editHoldingID = "";
@@ -90,6 +95,12 @@ function bindEvents() {
         state.submitMode = "screenshot";
       }
       render();
+      if (value === "ai-advice") {
+        const activeGroup = activeGroupFor(state.data?.groups ?? []);
+        if (activeGroup) {
+          loadGroupAdvice(activeGroup.id);
+        }
+      }
       return;
     }
 
@@ -257,10 +268,21 @@ async function handleGoogleCredential(response) {
 function render() {
   if (!state.session) {
     renderLogin();
-    return;
+  } else {
+    renderApp();
   }
 
-  renderApp();
+  syncChromeState();
+}
+
+function syncChromeState() {
+  const sheetOpen = Boolean(state.session && state.sheet);
+  document.documentElement.classList.toggle("sheet-open", sheetOpen);
+
+  const themeMeta = document.querySelector('meta[name="theme-color"]');
+  if (themeMeta) {
+    themeMeta.setAttribute("content", sheetOpen ? "#f2f2f7" : "#ffffff");
+  }
 }
 
 function renderLogin() {
@@ -312,7 +334,10 @@ function topbarHTML(activeGroup) {
           <div class="topbar-label">${escapeHTML(tabLabel)}</div>
           <div class="topbar-heading">${escapeHTML(activeGroup?.name || "持仓圈")}</div>
         </div>
-        <button class="secondary-button compact-button topbar-menu-button" type="button" data-action="sheet" data-value="groups">群组</button>
+        <div class="topbar-actions">
+          ${activeGroup ? `<button class="icon-button topbar-action-button" type="button" data-action="sheet" data-value="ai-advice" aria-label="AI 观察">${icon("sparkles")}</button>` : ""}
+          <button class="icon-button topbar-action-button" type="button" data-action="sheet" data-value="groups" aria-label="选择群组">${icon("layers")}</button>
+        </div>
       </div>
       <div class="topbar-subtle">${escapeHTML(activeGroup?.subtitle || "创建或加入一个群组开始共享持仓。")}</div>
     </header>
@@ -791,6 +816,10 @@ function sheetHTML(group) {
     return managingGroup ? groupManageSheetHTML(managingGroup) : "";
   }
 
+  if (state.sheet === "ai-advice" && group) {
+    return aiAdviceSheetHTML(group);
+  }
+
   if (state.sheet === "submit" && group) {
     return submitSheetHTML(group);
   }
@@ -900,6 +929,75 @@ function groupManageSheetHTML(group) {
   `;
 }
 
+function aiAdviceSheetHTML(group) {
+  const payload = state.adviceByGroupID[group.id];
+  const loading = state.adviceLoadingGroupID === group.id;
+  const generatedAt = payload?.generatedAt || payload?.advice?.generatedAt;
+  const advice = payload?.advice;
+
+  return `
+    <div class="sheet">
+      <section class="sheet-panel">
+        <div class="sheet-header">
+          <div>
+            <h2 class="sheet-title">AI 观察</h2>
+            <div class="subtle">${escapeHTML(group.name)} · 每日自动更新</div>
+          </div>
+          <button class="icon-button" type="button" data-action="close-sheet" aria-label="关闭">×</button>
+        </div>
+        ${loading ? aiAdviceLoadingHTML() : ""}
+        ${state.adviceError ? `<div class="error">${escapeHTML(state.adviceError)}</div>` : ""}
+        ${advice ? aiAdviceContentHTML(advice, generatedAt, payload.cached) : (!loading ? `<div class="empty">正在准备本群组的组合观察。</div>` : "")}
+        <div class="subtle advice-disclaimer">AI 观察仅用于复盘和讨论，不构成投资建议。</div>
+      </section>
+    </div>
+  `;
+}
+
+function aiAdviceLoadingHTML() {
+  return `
+    <section class="import-loading-card" aria-live="polite">
+      <div class="import-spinner" aria-hidden="true"></div>
+      <div class="min-w-0">
+        <div class="import-loading-title">正在生成群组观察</div>
+        <div class="import-loading-copy">大模型正在阅读当前可见持仓，生成集中度、共识和风险提示。</div>
+      </div>
+    </section>
+  `;
+}
+
+function aiAdviceContentHTML(advice, generatedAt, cached) {
+  return `
+    <section class="ai-advice-card">
+      <div class="ai-advice-head">
+        <div class="ai-advice-kicker">${cached ? "今日已更新" : "刚刚生成"}</div>
+        <h3>${escapeHTML(advice.headline || "今日组合观察")}</h3>
+        ${generatedAt ? `<div class="subtle">${escapeHTML(formatDateTime(generatedAt))}</div>` : ""}
+      </div>
+      <p>${escapeHTML(advice.summary || "当前可见持仓较少，建议先完善成员持仓后再复盘。")}</p>
+      ${adviceListHTML("关注点", advice.highlights)}
+      ${adviceListHTML("风险提示", advice.risks)}
+      ${adviceListHTML("复盘问题", advice.questions)}
+    </section>
+  `;
+}
+
+function adviceListHTML(title, items = []) {
+  const cleanedItems = items.map((item) => String(item ?? "").trim()).filter(Boolean).slice(0, 3);
+  if (!cleanedItems.length) {
+    return "";
+  }
+
+  return `
+    <div class="ai-advice-section">
+      <div class="ai-advice-section-title">${escapeHTML(title)}</div>
+      <ul>
+        ${cleanedItems.map((item) => `<li>${escapeHTML(item)}</li>`).join("")}
+      </ul>
+    </div>
+  `;
+}
+
 function submitSheetHTML(group) {
   return `
     <div class="sheet">
@@ -1005,7 +1103,7 @@ function draftsHTML() {
             ${draftMetaHTML()}
             <div class="subtle">识别结果可以先手工调整；成本价可留空，数量和现价用于计算市值。</div>
           </div>
-          <button class="secondary-button" type="button" data-action="import-drafts" ${state.busy || !state.drafts.length ? "disabled" : ""}>同步本次持仓</button>
+          <button class="secondary-button compact-button import-sync-button" type="button" data-action="import-drafts" ${state.busy || !state.drafts.length ? "disabled" : ""}>同步持仓</button>
         </div>
         ${draftWarningsHTML()}
         <div class="draft-list">
@@ -1206,13 +1304,16 @@ function memberButtonHTML(member, groupID, active) {
 }
 
 function exposureHTML(exposure) {
-  const holders = exposure.holderIDs
-    .map((memberID) => memberForID(memberID))
-    .filter(Boolean);
+  const holderWeights = exposure.holderWeights
+    .map((item) => ({
+      ...item,
+      member: memberForID(item.memberID)
+    }))
+    .filter((item) => item.member);
 
   return `
-    <article class="list-item exposure-card">
-      <div class="holding-card-head">
+    <article class="list-item exposure-card compact-exposure-card">
+      <div class="consensus-compact-head">
         <div class="min-w-0">
           <div class="holding-title">${escapeHTML(exposure.assetName || exposure.symbol)}</div>
           <div class="holding-meta">
@@ -1221,20 +1322,21 @@ function exposureHTML(exposure) {
             ${sourceCurrencyHTML(exposure.currency)}
           </div>
         </div>
-        <div class="value-stack">
-          <div class="holding-primary-value">${money(exposure.marketValue, "USD")}</div>
-          <div class="value-caption">合计可见市值</div>
-        </div>
       </div>
-      <div class="consensus-holder-row">
-        ${avatarStackHTML(holders, 4)}
-        <div class="consensus-holder-copy">${escapeHTML(holders.map((member) => member.displayName).join("、") || `${exposure.holderCount} 位成员`)}</div>
-      </div>
-      <div class="row-meta">
-        <span>合计数量 ${formatNumber(exposure.quantity)}</span>
-        <span>${exposure.holderCount} 位成员形成共识</span>
+      <div class="consensus-weight-list">
+        ${holderWeights.map((item) => consensusHolderWeightHTML(item)).join("")}
       </div>
     </article>
+  `;
+}
+
+function consensusHolderWeightHTML(item) {
+  return `
+    <div class="consensus-weight-item">
+      ${miniAvatarHTML(item.member)}
+      <span class="consensus-weight-name">${escapeHTML(item.member.displayName)}</span>
+      <strong>${escapeHTML(formatPercent(item.weight))}</strong>
+    </div>
   `;
 }
 
@@ -1452,6 +1554,7 @@ async function leaveGroup(groupID) {
       method: "DELETE"
     });
     state.data = normalizeBootstrap(result);
+    state.adviceByGroupID = {};
     state.activeGroupID = activeGroupIDAfterRemoval(previousActiveGroupID);
     state.selectedMemberID = "";
     state.sheet = "";
@@ -1476,6 +1579,7 @@ async function deleteGroup(groupID) {
       method: "DELETE"
     });
     state.data = normalizeBootstrap(result);
+    state.adviceByGroupID = {};
     state.activeGroupID = activeGroupIDAfterRemoval(previousActiveGroupID);
     state.selectedMemberID = "";
     state.sheet = "";
@@ -1844,9 +1948,30 @@ async function importDrafts() {
 async function refreshBootstrap() {
   const data = await api("/api/bootstrap");
   state.data = normalizeBootstrap(data);
+  state.adviceByGroupID = {};
   const groups = state.data.groups ?? [];
   if (!groups.some((group) => group.id === state.activeGroupID)) {
     state.activeGroupID = groups[0]?.id ?? "";
+  }
+}
+
+async function loadGroupAdvice(groupID) {
+  if (!groupID || state.adviceLoadingGroupID === groupID || state.adviceByGroupID[groupID]) {
+    return;
+  }
+
+  state.adviceLoadingGroupID = groupID;
+  state.adviceError = "";
+  render();
+
+  try {
+    const payload = await api(`/api/groups/${encodeURIComponent(groupID)}/advice`);
+    state.adviceByGroupID[groupID] = payload;
+  } catch (error) {
+    state.adviceError = error.message || "AI 观察生成失败，请稍后再试。";
+  } finally {
+    state.adviceLoadingGroupID = "";
+    render();
   }
 }
 
@@ -1952,6 +2077,9 @@ function clearSession() {
   state.drafts = [];
   state.draftMeta = null;
   state.importProgress = null;
+  state.adviceByGroupID = {};
+  state.adviceLoadingGroupID = "";
+  state.adviceError = "";
 }
 
 function normalizeBootstrap(data) {
@@ -2042,24 +2170,38 @@ function exposureRows(holdings) {
       quantity: 0,
       marketValue: 0,
       costBasis: 0,
-      holderIDs: new Set()
+      holderIDs: new Set(),
+      holderValues: new Map()
     };
     existing.quantity += Number(holding.quantity);
-    existing.marketValue += holdingMarketValueUSD(holding);
+    const marketValue = holdingMarketValueUSD(holding);
+    existing.marketValue += marketValue;
     if (canSeeCost(holding)) {
       existing.costBasis += holdingCostBasisUSD(holding);
     }
     existing.holderIDs.add(holding.ownerID);
+    existing.holderValues.set(holding.ownerID, (existing.holderValues.get(holding.ownerID) ?? 0) + marketValue);
     grouped.set(key, existing);
   }
 
   return Array.from(grouped.values())
-    .map((item) => ({
-      ...item,
-      holderIDs: Array.from(item.holderIDs),
-      holderCount: item.holderIDs.size,
-      pnl: item.costBasis ? item.marketValue - item.costBasis : 0
-    }))
+    .map((item) => {
+      const holderWeights = Array.from(item.holderValues.entries())
+        .map(([memberID, marketValue]) => ({
+          memberID,
+          marketValue,
+          weight: item.marketValue ? marketValue / item.marketValue : 0
+        }))
+        .sort((first, second) => second.marketValue - first.marketValue);
+
+      return {
+        ...item,
+        holderIDs: Array.from(item.holderIDs),
+        holderWeights,
+        holderCount: item.holderIDs.size,
+        pnl: item.costBasis ? item.marketValue - item.costBasis : 0
+      };
+    })
     .sort((first, second) => second.marketValue - first.marketValue);
 }
 
@@ -2894,7 +3036,9 @@ function icon(name) {
   const paths = {
     chart: `<path d="M4 18h16M7 15V9m5 6V5m5 10v-4" />`,
     users: `<path d="M8 19a4 4 0 0 1 8 0M8 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8 2a3 3 0 0 1 3 3M16 5a3 3 0 0 1 0 6" />`,
-    user: `<path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0" />`
+    user: `<path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0" />`,
+    layers: `<path d="m12 3 8 4.5-8 4.5-8-4.5L12 3Z" /><path d="m4 12 8 4.5 8-4.5" /><path d="m4 16.5 8 4.5 8-4.5" />`,
+    sparkles: `<path d="M12 3l1.35 4.15L17.5 8.5l-4.15 1.35L12 14l-1.35-4.15L6.5 8.5l4.15-1.35L12 3Z" /><path d="M5 14l.8 2.2L8 17l-2.2.8L5 20l-.8-2.2L2 17l2.2-.8L5 14Z" /><path d="M18 13l.95 2.55L21.5 16.5l-2.55.95L18 20l-.95-2.55-2.55-.95 2.55-.95L18 13Z" />`
   };
   return `<svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]}</svg>`;
 }
