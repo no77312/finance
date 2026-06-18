@@ -507,6 +507,54 @@ button.list-item.active {
   font-size: 12px;
 }
 
+.member-selector-section {
+  gap: 0;
+}
+
+.member-selector-button {
+  width: 100%;
+  min-height: 66px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  text-align: left;
+  color: var(--ink);
+}
+
+.member-selector-value {
+  min-width: 0;
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  text-align: right;
+}
+
+.member-selector-value strong {
+  font-size: 17px;
+  line-height: 1.05;
+  white-space: nowrap;
+}
+
+.member-selector-value span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.member-selector-chevron {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--control);
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+}
+
 .holding-card {
   gap: 12px;
 }
@@ -667,7 +715,8 @@ button.list-item.active {
 }
 
 .portfolio-summary {
-  gap: 16px;
+  gap: 12px;
+  padding: 14px;
 }
 
 .portfolio-owner-row {
@@ -682,8 +731,8 @@ button.list-item.active {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 14px;
   align-items: center;
-  padding: 14px 16px;
-  border-radius: 24px;
+  padding: 12px 14px;
+  border-radius: 20px;
   background: linear-gradient(180deg, #fbfbfd 0%, #f5f7fb 100%);
   border: 1px solid rgba(229, 229, 234, 0.78);
 }
@@ -696,19 +745,19 @@ button.list-item.active {
 
 .portfolio-focus-title {
   margin-top: 3px;
-  font-size: 24px;
+  font-size: 21px;
   line-height: 1.05;
   font-weight: 820;
   overflow-wrap: anywhere;
 }
 
 .portfolio-stat-grid-compact .portfolio-stat {
-  padding: 12px;
-  border-radius: 18px;
+  padding: 10px 12px;
+  border-radius: 16px;
 }
 
 .portfolio-stat-grid-compact .portfolio-stat-value {
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .section-wide {
@@ -869,7 +918,7 @@ button.list-item.active {
 
 .profile-card,
 .member-overview-card {
-  gap: 14px;
+  gap: 10px;
 }
 
 .profile-card-head,
@@ -894,25 +943,129 @@ button.list-item.active {
   font-size: 13px;
 }
 
+.profile-close-button {
+  width: 32px;
+  min-height: 32px;
+  background: var(--control);
+  color: var(--muted);
+  font-size: 18px;
+  font-weight: 700;
+  box-shadow: none;
+}
+
+.compact-sheet-panel {
+  gap: 12px;
+  padding: 18px;
+}
+
+.member-select-list {
+  display: grid;
+  gap: 8px;
+}
+
+.member-select-option {
+  width: 100%;
+  min-height: 62px;
+  border-radius: 20px;
+  padding: 10px 12px;
+  background: var(--control);
+  color: var(--ink);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  text-align: left;
+}
+
+.member-select-option.active {
+  background: var(--accent-soft);
+  border: 1px solid rgba(0, 122, 255, 0.2);
+}
+
+.member-select-metrics {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  text-align: right;
+}
+
+.member-select-metrics strong {
+  font-size: 15px;
+  line-height: 1.05;
+  white-space: nowrap;
+}
+
+.member-select-metrics span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
 .member-overview-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
 }
 
 .member-overview-card {
   align-content: start;
+  padding: 13px;
+  border-radius: 24px;
+}
+
+.member-overview-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.member-overview-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 760;
+}
+
+.member-overview-name .mini-avatar {
+  width: 28px;
+  height: 28px;
+  margin-left: 0;
+  border-width: 1px;
+}
+
+.member-overview-name span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .member-overview-value {
-  font-size: 22px;
+  font-size: 18px;
   line-height: 1.05;
   font-weight: 800;
   white-space: nowrap;
 }
 
+.member-overview-subline {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.member-overview-subline span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .member-allocation-strip {
-  height: 10px;
+  height: 8px;
 }
 
 .consensus-holder-row {
@@ -1285,10 +1438,10 @@ button.list-item.active {
   min-height: 52px;
   display: grid;
   place-items: center;
-  gap: 4px;
+  gap: 3px;
   background: transparent;
   color: var(--muted);
-  border-radius: var(--radius-md);
+  border-radius: 22px;
   font-size: 13px;
   font-weight: 600;
   transition:
@@ -1298,13 +1451,29 @@ button.list-item.active {
 }
 
 .tabbar .tab-icon {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
+  padding: 2px;
+  border-radius: 12px;
+  transition:
+    width 180ms var(--ease-standard),
+    height 180ms var(--ease-standard),
+    padding 180ms var(--ease-standard),
+    background 180ms var(--ease-standard),
+    color 180ms var(--ease-standard);
 }
 
 .tabbar button.active {
   color: var(--accent);
-  background: transparent;
+  background: rgba(0, 122, 255, 0.07);
+}
+
+.tabbar button.active .tab-icon {
+  width: 30px;
+  height: 30px;
+  padding: 5px;
+  background: var(--accent);
+  color: #ffffff;
 }
 
 .sheet {
@@ -1459,7 +1628,16 @@ button.list-item.active {
 }
 
 .snapshot-card {
-  gap: 14px;
+  gap: 10px;
+}
+
+.snapshot-feed-list {
+  gap: 8px;
+}
+
+.snapshot-feed-card {
+  padding: 13px;
+  border-radius: 24px;
 }
 
 .snapshot-card-head {
@@ -1467,6 +1645,10 @@ button.list-item.active {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
+}
+
+.snapshot-feed-head {
+  gap: 10px;
 }
 
 .account-compact {
@@ -1486,17 +1668,17 @@ button.list-item.active {
 .snapshot-meta {
   display: grid;
   justify-items: end;
-  gap: 6px;
+  gap: 4px;
   text-align: right;
 }
 
 .snapshot-highlight {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 14px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
   align-items: center;
-  padding: 14px 16px;
-  border-radius: 24px;
+  padding: 10px 12px;
+  border-radius: 18px;
   background: #f7f7fb;
   border: 1px solid rgba(229, 229, 234, 0.78);
 }
@@ -1521,7 +1703,7 @@ button.list-item.active {
 
 .snapshot-highlight-title {
   margin-top: 3px;
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1.15;
   font-weight: 780;
   overflow: hidden;
@@ -1544,7 +1726,7 @@ button.list-item.active {
 }
 
 .snapshot-highlight-value strong {
-  font-size: 17px;
+  font-size: 15px;
 }
 
 .snapshot-highlight-value span {
@@ -1554,21 +1736,53 @@ button.list-item.active {
 
 .snapshot-change-list {
   display: grid;
-  gap: 10px;
+  gap: 6px;
+}
+
+.compact-change-list {
+  gap: 4px;
 }
 
 .snapshot-change-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 9px;
   align-items: center;
-  padding-top: 10px;
-  border-top: 1px solid rgba(60, 60, 67, 0.1);
+  min-height: 38px;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 16px;
+  background: rgba(242, 242, 247, 0.72);
 }
 
 .snapshot-change-row:first-child {
-  padding-top: 0;
   border-top: 0;
+}
+
+.snapshot-change-icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--control-strong);
+  color: var(--muted);
+}
+
+.snapshot-change-icon.positive {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.snapshot-change-icon.negative {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.snapshot-change-icon .tab-icon {
+  width: 16px;
+  height: 16px;
+  padding: 0;
 }
 
 .snapshot-change-symbol {
@@ -1584,7 +1798,7 @@ button.list-item.active {
 
 .snapshot-change-symbol span {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .snapshot-change-values {
@@ -1596,12 +1810,12 @@ button.list-item.active {
 }
 
 .snapshot-change-values strong {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 760;
 }
 
 .snapshot-change-values span {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
 }
 
@@ -1953,12 +2167,7 @@ button.list-item.active {
 
   .overview-heading,
   .holding-card-head,
-  .portfolio-owner-row,
-  .portfolio-focus,
-  .profile-card-head,
-  .member-overview-head,
-  .snapshot-card-head,
-  .snapshot-highlight {
+  .member-overview-head {
     grid-template-columns: 1fr;
   }
 
@@ -1992,29 +2201,23 @@ button.list-item.active {
     font-size: 20px;
   }
 
-  .member-overview-card .value-stack {
-    justify-items: start;
-    text-align: left;
-  }
-
   .member-overview-value {
-    font-size: 20px;
+    font-size: 17px;
   }
 
   .holding-card-side,
-  .snapshot-meta,
-  .snapshot-highlight-value {
+  .snapshot-meta {
     justify-items: start;
     text-align: left;
   }
 
   .snapshot-change-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: auto minmax(0, 1fr) auto;
   }
 
   .snapshot-change-values {
-    justify-items: start;
-    text-align: left;
+    justify-items: end;
+    text-align: right;
   }
 
   .group-overview-note,
@@ -2025,6 +2228,21 @@ button.list-item.active {
   .member-list-footer {
     display: grid;
     gap: 4px;
+  }
+
+  .member-selector-button,
+  .member-select-option {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .member-selector-value,
+  .member-select-metrics {
+    justify-items: end;
+    text-align: right;
+  }
+
+  .member-selector-chevron {
+    display: none;
   }
 }
 

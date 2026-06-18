@@ -158,6 +158,9 @@ function bindEvents() {
 
     if (action === "select-member") {
       state.selectedMemberID = value;
+      if (state.sheet === "member-select") {
+        state.sheet = "";
+      }
       render();
       return;
     }
@@ -396,9 +399,8 @@ function overviewHTML(group) {
             <h2 class="section-title">最近更新</h2>
             <div class="subtle">按每次提交展示仓位占比变化</div>
           </div>
-          <button class="primary-button" type="button" data-action="sheet" data-value="submit">提交持仓</button>
         </div>
-        <div class="list">
+        <div class="list snapshot-feed-list">
           ${snapshots.length ? snapshots.map(snapshotUpdateHTML).join("") : `<div class="empty">还没有成员提交持仓。</div>`}
         </div>
       </section>
@@ -412,19 +414,8 @@ function membersHTML(group) {
   const selectedMember = group.members?.find((member) => member.id === selectedID);
 
   return `
-    <main class="content member-layout">
-      <section class="section">
-        <div class="section-header">
-          <div class="section-header-copy">
-            <h2 class="section-title">成员</h2>
-            <div class="subtle">快速比较每个人的组合结构</div>
-          </div>
-          <span class="subtle">${group.members?.length ?? 0} 人</span>
-        </div>
-        <div class="list">
-          ${(group.members ?? []).map((member) => memberButtonHTML(member, group.id, member.id === selectedID)).join("")}
-        </div>
-      </section>
+    <main class="content single member-layout">
+      ${memberSelectorSectionHTML(group, selectedMember)}
       ${portfolioSectionHTML(group, selectedID, {
         title: selectedMember?.displayName || "成员持仓",
         owner: selectedMember
@@ -476,7 +467,7 @@ function myProfileHTML(user, group) {
               <div class="account-mail">${escapeHTML(user?.email || "Google 登录")}</div>
             </div>
           </div>
-          <button class="text-button compact-button" type="button" data-action="sign-out">退出</button>
+          <button class="icon-button profile-close-button" type="button" data-action="sign-out" aria-label="退出登录">×</button>
         </div>
         <div class="profile-meta-row">
           <span>当前群组 ${escapeHTML(group.name)}</span>
@@ -640,7 +631,7 @@ function portfolioSectionHTML(group, ownerID, options = {}) {
     <section class="section ${escapeAttr(options.sectionClass || "")}">
       <div class="section-header">
         <h2 class="section-title">${escapeHTML(options.title || "持仓")}</h2>
-        ${options.actionLabel ? `<button class="primary-button" type="button" data-action="sheet" data-value="submit">${escapeHTML(options.actionLabel)}</button>` : `<span class="subtle">${holdings.length} 项</span>`}
+        ${options.actionLabel ? `<button class="primary-button compact-button section-action-button" type="button" data-action="sheet" data-value="submit">${escapeHTML(options.actionLabel)}</button>` : `<span class="subtle">${holdings.length} 项</span>`}
       </div>
       ${portfolioSummaryHTML(insights, {
         owner: options.owner,
@@ -655,6 +646,36 @@ function portfolioSectionHTML(group, ownerID, options = {}) {
           })).join("")
           : `<div class="empty">${options.editable ? "你还没有在这个群组提交持仓。" : "这个成员还没有提交持仓。"}</div>`}
       </div>
+    </section>
+  `;
+}
+
+function memberSelectorSectionHTML(group, selectedMember) {
+  const holdings = selectedMember
+    ? groupHoldings(group.id).filter((holding) => holding.ownerID === selectedMember.id)
+    : [];
+  const insights = selectedMember ? buildPortfolioInsights(group.id, selectedMember.id, holdings) : null;
+  const summary = visibleSummary(holdings);
+  const primaryValue = selectedMember && insights
+    ? memberPrimaryValue(summary, holdings, insights)
+    : "选择成员";
+
+  return `
+    <section class="section member-selector-section">
+      <button class="panel member-selector-button" type="button" data-action="sheet" data-value="member-select">
+        <div class="account account-compact">
+          ${avatarHTML(selectedMember)}
+          <div class="min-w-0">
+            <div class="account-name">${escapeHTML(selectedMember?.displayName || "选择成员")}</div>
+            <div class="member-meta">${escapeHTML(selectedMember && insights ? memberOverviewCaption(holdings, insights) : `${group.members?.length ?? 0} 位成员`)}</div>
+          </div>
+        </div>
+        <div class="member-selector-value">
+          <strong>${escapeHTML(primaryValue)}</strong>
+          <span>${escapeHTML(selectedMember && insights ? memberOverviewWeightCopy(holdings, insights) : "切换成员")}</span>
+        </div>
+        <span class="member-selector-chevron" aria-hidden="true">⌄</span>
+      </button>
     </section>
   `;
 }
@@ -684,18 +705,16 @@ function memberOverviewCardHTML(member, groupID) {
 
   return `
     <button class="list-item member-overview-card" type="button" data-action="open-member" data-value="${escapeAttr(member.id)}">
-      <div class="member-overview-head">
-        <div class="account">
-          ${avatarHTML(member)}
-          <div class="min-w-0">
-            <div class="member-name">${escapeHTML(member.displayName)}</div>
-            <div class="member-meta">${escapeHTML(caption)}</div>
-          </div>
+      <div class="member-overview-line">
+        <div class="member-overview-name min-w-0">
+          ${miniAvatarHTML(member)}
+          <span>${escapeHTML(member.displayName)}</span>
         </div>
-        <div class="value-stack">
-          <div class="member-overview-value">${escapeHTML(primaryValue)}</div>
-          <div class="value-caption">${escapeHTML(memberOverviewWeightCopy(holdings, insights))}</div>
-        </div>
+        <div class="member-overview-value">${escapeHTML(primaryValue)}</div>
+      </div>
+      <div class="member-overview-subline">
+        <span>${escapeHTML(caption)}</span>
+        <span>${escapeHTML(memberOverviewWeightCopy(holdings, insights))}</span>
       </div>
       ${miniAllocationHTML(insights.topSlices, "member-allocation-strip")}
       <div class="member-symbol-row">
@@ -820,6 +839,10 @@ function sheetHTML(group) {
     return aiAdviceSheetHTML(group);
   }
 
+  if (state.sheet === "member-select" && group) {
+    return memberSelectSheetHTML(group);
+  }
+
   if (state.sheet === "submit" && group) {
     return submitSheetHTML(group);
   }
@@ -926,6 +949,51 @@ function groupManageSheetHTML(group) {
         </section>
       </section>
     </div>
+  `;
+}
+
+function memberSelectSheetHTML(group) {
+  const members = group.members ?? [];
+  const selectedID = state.selectedMemberID || members[0]?.id || "";
+
+  return `
+    <div class="sheet">
+      <section class="sheet-panel compact-sheet-panel">
+        <div class="sheet-header">
+          <div>
+            <h2 class="sheet-title">选择成员</h2>
+            <div class="subtle">${members.length} 位成员 · 快速切换组合</div>
+          </div>
+          <button class="icon-button" type="button" data-action="close-sheet" aria-label="关闭">×</button>
+        </div>
+        <div class="member-select-list">
+          ${members.map((member) => memberSelectOptionHTML(member, group.id, member.id === selectedID)).join("")}
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function memberSelectOptionHTML(member, groupID, active) {
+  const holdings = groupHoldings(groupID).filter((holding) => holding.ownerID === member.id);
+  const summary = visibleSummary(holdings);
+  const insights = buildPortfolioInsights(groupID, member.id, holdings);
+  const latestActivity = latestActivityAt(holdings, insights.latestSnapshotAt);
+
+  return `
+    <button class="member-select-option ${active ? "active" : ""}" type="button" data-action="select-member" data-value="${escapeAttr(member.id)}">
+      <div class="account account-compact">
+        ${avatarHTML(member)}
+        <div class="min-w-0">
+          <div class="member-name">${escapeHTML(member.displayName)}</div>
+          <div class="member-meta">${holdings.length} 项 · ${latestActivity ? escapeHTML(formatDateTime(latestActivity)) : "暂无更新"}</div>
+        </div>
+      </div>
+      <div class="member-select-metrics">
+        <strong>${summary.marketValue ? money(summary.marketValue, "USD") : "暂无"}</strong>
+        <span>${escapeHTML(memberOverviewConcentrationCopy(holdings, insights))}</span>
+      </div>
+    </button>
   `;
 }
 
@@ -1392,18 +1460,17 @@ function holdingStatsHTML({
 
 function snapshotUpdateHTML(summary) {
   return `
-    <article class="list-item snapshot-card">
-      <div class="snapshot-card-head">
+    <article class="list-item snapshot-card snapshot-feed-card">
+      <div class="snapshot-card-head snapshot-feed-head">
         <div class="account account-compact">
           ${avatarHTML(summary.owner)}
           <div class="min-w-0">
             <div class="account-name">${escapeHTML(summary.owner?.displayName || "成员")}</div>
-            <div class="member-meta">${escapeHTML(summary.previousSnapshot ? "组合调仓" : "首次提交组合")}</div>
+            <div class="member-meta">${escapeHTML(summary.previousSnapshot ? "组合调仓" : "首次提交组合")} · ${escapeHTML(formatDateTime(summary.snapshot.createdAt))}</div>
           </div>
         </div>
         <div class="snapshot-meta">
           <span class="pill ${summary.sourceTone}">${escapeHTML(summary.sourceLabel)}</span>
-          <span class="subtle">${escapeHTML(formatDateTime(summary.snapshot.createdAt))}</span>
         </div>
       </div>
       ${summary.primaryChange ? snapshotHighlightHTML(summary.primaryChange) : ""}
@@ -1412,8 +1479,8 @@ function snapshotUpdateHTML(summary) {
           <span class="weight-chip ${escapeAttr(chip.tone)}">${escapeHTML(chip.label)}</span>
         `).join("") : `<span class="weight-chip">仓位占比无变化</span>`}
       </div>
-      <div class="snapshot-change-list">
-        ${summary.rows.length ? summary.rows.map(snapshotChangeRowHTML).join("") : `<div class="snapshot-empty">本次提交没有产生新的仓位占比变化。</div>`}
+      <div class="snapshot-change-list compact-change-list">
+        ${summary.rows.length ? summary.rows.slice(0, 4).map(snapshotChangeRowHTML).join("") : `<div class="snapshot-empty">本次提交没有产生新的仓位占比变化。</div>`}
       </div>
       ${summary.note ? `<div class="holding-change"><span>${escapeHTML(summary.note)}</span></div>` : ""}
     </article>
@@ -1424,6 +1491,7 @@ function snapshotHighlightHTML(change) {
   const tone = changeToneClass(change.status);
   return `
     <div class="snapshot-highlight ${tone}">
+      ${snapshotChangeIconHTML(change)}
       <div class="min-w-0">
         <div class="snapshot-highlight-label">主要变化</div>
         <div class="snapshot-highlight-title">${escapeHTML(change.assetName || change.symbol)}</div>
@@ -1442,6 +1510,7 @@ function snapshotChangeRowHTML(change) {
 
   return `
     <div class="snapshot-change-row">
+      ${snapshotChangeIconHTML(change)}
       <div class="snapshot-change-symbol min-w-0">
         <strong>${escapeHTML(change.assetName || change.symbol)}</strong>
         <span>${escapeHTML(change.symbol)} · ${escapeHTML(change.statusLabel)}</span>
@@ -1452,6 +1521,16 @@ function snapshotChangeRowHTML(change) {
       </div>
     </div>
   `;
+}
+
+function snapshotChangeIconHTML(change) {
+  const iconName = {
+    new: "plus",
+    up: "arrow-up",
+    down: "arrow-down",
+    removed: "minus"
+  }[change.status] ?? "adjust";
+  return `<span class="snapshot-change-icon ${changeToneClass(change.status)}" aria-hidden="true">${icon(iconName)}</span>`;
 }
 
 function changeToneClass(status) {
@@ -1492,9 +1571,9 @@ function eventHTML(event) {
 
 function tabbarHTML() {
   const tabs = [
-    ["overview", "总览", icon("chart")],
-    ["members", "成员", icon("users")],
-    ["mine", "我的", icon("user")]
+    ["overview", "总览", icon("overview")],
+    ["members", "成员", icon("member-group")],
+    ["mine", "我的", icon("profile")]
   ];
 
   return `
@@ -3034,11 +3113,19 @@ function miniAvatarHTML(user) {
 
 function icon(name) {
   const paths = {
+    overview: `<path d="M4 19V9.5a1.5 1.5 0 0 1 .55-1.16l6.5-5.44a1.5 1.5 0 0 1 1.9 0l6.5 5.44A1.5 1.5 0 0 1 20 9.5V19a1 1 0 0 1-1 1h-4.2a1 1 0 0 1-1-1v-4.2h-3.6V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1Z" /><path d="M8 10.5h8" />`,
+    "member-group": `<path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" /><path d="M3 21a6 6 0 0 1 12 0" /><path d="M17 9.5a3 3 0 1 0 0-6" /><path d="M17 14a5 5 0 0 1 4 4.8" />`,
+    profile: `<path d="M12 12.5a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Z" /><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0" />`,
     chart: `<path d="M4 18h16M7 15V9m5 6V5m5 10v-4" />`,
     users: `<path d="M8 19a4 4 0 0 1 8 0M8 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8 2a3 3 0 0 1 3 3M16 5a3 3 0 0 1 0 6" />`,
     user: `<path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0" />`,
     layers: `<path d="m12 3 8 4.5-8 4.5-8-4.5L12 3Z" /><path d="m4 12 8 4.5 8-4.5" /><path d="m4 16.5 8 4.5 8-4.5" />`,
-    sparkles: `<path d="M12 3l1.35 4.15L17.5 8.5l-4.15 1.35L12 14l-1.35-4.15L6.5 8.5l4.15-1.35L12 3Z" /><path d="M5 14l.8 2.2L8 17l-2.2.8L5 20l-.8-2.2L2 17l2.2-.8L5 14Z" /><path d="M18 13l.95 2.55L21.5 16.5l-2.55.95L18 20l-.95-2.55-2.55-.95 2.55-.95L18 13Z" />`
+    sparkles: `<path d="M12 3l1.35 4.15L17.5 8.5l-4.15 1.35L12 14l-1.35-4.15L6.5 8.5l4.15-1.35L12 3Z" /><path d="M5 14l.8 2.2L8 17l-2.2.8L5 20l-.8-2.2L2 17l2.2-.8L5 14Z" /><path d="M18 13l.95 2.55L21.5 16.5l-2.55.95L18 20l-.95-2.55-2.55-.95 2.55-.95L18 13Z" />`,
+    plus: `<path d="M12 5v14M5 12h14" />`,
+    minus: `<path d="M5 12h14" />`,
+    "arrow-up": `<path d="M12 19V5" /><path d="m6 11 6-6 6 6" />`,
+    "arrow-down": `<path d="M12 5v14" /><path d="m18 13-6 6-6-6" />`,
+    adjust: `<path d="M4 7h16M7 12h10M10 17h4" />`
   };
   return `<svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]}</svg>`;
 }
