@@ -1051,7 +1051,27 @@ button.list-item.active {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
+}
+
+.group-menu-select {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
   text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.group-menu-action {
+  justify-self: end;
+  min-width: 64px;
 }
 
 .group-menu-item.active {
@@ -1671,6 +1691,14 @@ button.list-item.active {
   .snapshot-highlight,
   .group-menu-item {
     grid-template-columns: 1fr;
+  }
+
+  .group-menu-select {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .group-menu-action {
+    justify-self: stretch;
   }
 
   .exposure-card .holding-card-head {

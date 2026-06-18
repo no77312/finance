@@ -115,6 +115,16 @@ function bindEvents() {
       return;
     }
 
+    if (action === "leave-group") {
+      leaveGroup(value);
+      return;
+    }
+
+    if (action === "delete-group") {
+      deleteGroup(value);
+      return;
+    }
+
     if (action === "select-member") {
       state.selectedMemberID = value;
       render();
@@ -810,17 +820,24 @@ function groupMenuHTML(groups) {
 }
 
 function groupMenuItemHTML(group, active) {
+  const owner = isCurrentUserGroupOwner(group);
+  const action = owner ? "delete-group" : "leave-group";
+  const actionLabel = owner ? "解散" : "退出";
+  const actionClass = owner ? "danger-button" : "text-button";
   return `
-    <button class="group-menu-item ${active ? "active" : ""}" type="button" data-action="select-group" data-value="${escapeAttr(group.id)}" aria-pressed="${active ? "true" : "false"}">
-      <div class="min-w-0">
-        <div class="group-menu-item-name">${escapeHTML(group.name)}</div>
-        <div class="group-menu-item-meta">
-          <span>${group.members?.length ?? 0} 人</span>
-          ${group.inviteCode ? `<span>邀请码 ${escapeHTML(group.inviteCode)}</span>` : ""}
+    <div class="group-menu-item ${active ? "active" : ""}">
+      <button class="group-menu-select" type="button" data-action="select-group" data-value="${escapeAttr(group.id)}" aria-pressed="${active ? "true" : "false"}">
+        <div class="min-w-0">
+          <div class="group-menu-item-name">${escapeHTML(group.name)}</div>
+          <div class="group-menu-item-meta">
+            <span>${group.members?.length ?? 0} 人</span>
+            ${group.inviteCode ? `<span>邀请码 ${escapeHTML(group.inviteCode)}</span>` : ""}
+          </div>
         </div>
-      </div>
-      <span class="pill ${active ? "blue" : ""}">${active ? "当前群组" : "切换"}</span>
-    </button>
+        <span class="pill ${active ? "blue" : ""}">${active ? "当前群组" : "切换"}</span>
+      </button>
+      <button class="${actionClass} compact-button group-menu-action" type="button" data-action="${action}" data-value="${escapeAttr(group.id)}" ${state.busy ? "disabled" : ""}>${actionLabel}</button>
+    </div>
   `;
 }
 
@@ -1336,6 +1353,52 @@ async function joinGroup(formData) {
   });
 }
 
+async function leaveGroup(groupID) {
+  const group = groupByID(groupID);
+  if (!group) {
+    return;
+  }
+
+  if (!confirm(`退出「${group.name}」后，你在该群组的持仓和提交记录将被移除。确定退出吗？`)) {
+    return;
+  }
+
+  await runBusy(async () => {
+    const previousActiveGroupID = state.activeGroupID;
+    const result = await api(`/api/groups/${encodeURIComponent(groupID)}/membership`, {
+      method: "DELETE"
+    });
+    state.data = normalizeBootstrap(result);
+    state.activeGroupID = activeGroupIDAfterRemoval(previousActiveGroupID);
+    state.selectedMemberID = "";
+    state.sheet = "";
+    setNotice("success", "已退出群组。");
+  });
+}
+
+async function deleteGroup(groupID) {
+  const group = groupByID(groupID);
+  if (!group) {
+    return;
+  }
+
+  if (!confirm(`解散「${group.name}」会删除该群组、全部成员持仓和历史记录。确定解散吗？`)) {
+    return;
+  }
+
+  await runBusy(async () => {
+    const previousActiveGroupID = state.activeGroupID;
+    const result = await api(`/api/groups/${encodeURIComponent(groupID)}`, {
+      method: "DELETE"
+    });
+    state.data = normalizeBootstrap(result);
+    state.activeGroupID = activeGroupIDAfterRemoval(previousActiveGroupID);
+    state.selectedMemberID = "";
+    state.sheet = "";
+    setNotice("success", "群组已解散。");
+  });
+}
+
 async function saveHolding(formData) {
   const group = activeGroupFor(state.data?.groups ?? []);
   if (!group) {
@@ -1796,6 +1859,21 @@ function closeSheet() {
 
 function activeGroupFor(groups) {
   return groups.find((group) => group.id === state.activeGroupID) ?? groups[0] ?? null;
+}
+
+function activeGroupIDAfterRemoval(previousActiveGroupID) {
+  const groups = state.data?.groups ?? [];
+  return groups.some((group) => group.id === previousActiveGroupID) ? previousActiveGroupID : groups[0]?.id ?? "";
+}
+
+function groupByID(groupID) {
+  return (state.data?.groups ?? []).find((group) => group.id === groupID) ?? null;
+}
+
+function isCurrentUserGroupOwner(group) {
+  const currentMemberID = state.session?.currentMemberID;
+  const member = (group.members ?? []).find((candidate) => candidate.id === currentMemberID);
+  return member?.role === "owner" || group.members?.[0]?.id === currentMemberID;
 }
 
 function groupHoldings(groupID) {

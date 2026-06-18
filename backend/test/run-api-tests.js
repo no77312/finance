@@ -53,6 +53,7 @@ async function main() {
     await signsInAndJoinsGroupByInviteCode();
     await signsInWithGoogleAndCreatesGroup();
     await createsGroupForSignedInUser();
+    await leavesGroupAndDisbandsGroup();
     await syncsSnapshotHoldingsForCurrentMember();
     await createsHoldingAndIncludesItInAnalytics();
     await rejectsPriceRefreshWithoutToken();
@@ -152,6 +153,68 @@ async function createsGroupForSignedInUser() {
 
   const groups = await getJsonWithMember(signedIn.currentMemberID, signedIn.sessionToken, "/api/groups");
   assert.deepEqual(groups.groups.map((group) => group.id), [created.group.id]);
+}
+
+async function leavesGroupAndDisbandsGroup() {
+  const owner = await postJsonWithoutMember("/api/auth/device", {
+    deviceID: "group-owner-user",
+    displayName: "Owner"
+  });
+  const member = await postJsonWithoutMember("/api/auth/device", {
+    deviceID: "group-member-user",
+    displayName: "Member"
+  });
+
+  const created = await postJsonWithMember(owner.currentMemberID, owner.sessionToken, "/api/groups", {
+    name: "可退出的小组",
+    subtitle: "测试退出和解散"
+  });
+  const groupIDForTest = created.group.id;
+
+  await postJsonWithMember(member.currentMemberID, member.sessionToken, "/api/groups/join", {
+    inviteCode: created.group.inviteCode
+  });
+  await postJsonWithMember(member.currentMemberID, member.sessionToken, `/api/groups/${groupIDForTest}/holdings`, {
+    symbol: "TSLA",
+    assetName: "Tesla",
+    market: "usStock",
+    quantity: 2,
+    averageCost: 180,
+    lastPrice: 220,
+    currency: "USD",
+    visibility: "amountOnly"
+  });
+
+  const ownerLeaveResponse = await fetch(`${baseURL}/api/groups/${groupIDForTest}/membership`, {
+    method: "DELETE",
+    headers: authHeaders(owner.currentMemberID, owner.sessionToken)
+  });
+  assert.equal(ownerLeaveResponse.status, 403);
+
+  const nonOwnerDisbandResponse = await fetch(`${baseURL}/api/groups/${groupIDForTest}`, {
+    method: "DELETE",
+    headers: authHeaders(member.currentMemberID, member.sessionToken)
+  });
+  assert.equal(nonOwnerDisbandResponse.status, 403);
+
+  const left = await deleteJsonWithMember(member.currentMemberID, member.sessionToken, `/api/groups/${groupIDForTest}/membership`);
+  assert.ok(!left.groups.some((group) => group.id === groupIDForTest));
+
+  const memberAccessResponse = await fetch(`${baseURL}/api/groups/${groupIDForTest}`, {
+    headers: authHeaders(member.currentMemberID, member.sessionToken)
+  });
+  assert.equal(memberAccessResponse.status, 403);
+
+  const ownerHoldings = await getJsonWithMember(owner.currentMemberID, owner.sessionToken, `/api/groups/${groupIDForTest}/holdings`);
+  assert.ok(!ownerHoldings.holdings.some((holding) => holding.symbol === "TSLA"));
+
+  const disbanded = await deleteJsonWithMember(owner.currentMemberID, owner.sessionToken, `/api/groups/${groupIDForTest}`);
+  assert.ok(!disbanded.groups.some((group) => group.id === groupIDForTest));
+
+  const deletedGroupResponse = await fetch(`${baseURL}/api/groups/${groupIDForTest}`, {
+    headers: authHeaders(owner.currentMemberID, owner.sessionToken)
+  });
+  assert.equal(deletedGroupResponse.status, 404);
 }
 
 async function parsesScreenshotImportDraftsWithoutModelKey() {
@@ -704,6 +767,22 @@ async function putJson(path, body) {
   });
   assert.equal(response.ok, true, `${path} returned ${response.status}`);
   return response.json();
+}
+
+async function deleteJsonWithMember(member, sessionToken, path) {
+  const response = await fetch(`${baseURL}${path}`, {
+    method: "DELETE",
+    headers: authHeaders(member, sessionToken)
+  });
+  assert.equal(response.ok, true, `${path} returned ${response.status}`);
+  return response.json();
+}
+
+function authHeaders(member, sessionToken) {
+  return {
+    "X-Member-ID": member,
+    "X-Session-Token": sessionToken
+  };
 }
 
 function refreshHeaders() {

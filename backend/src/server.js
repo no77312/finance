@@ -84,6 +84,8 @@ async function routeRequest(request, response, store, context) {
         "POST /api/groups",
         "POST /api/groups/join",
         "GET /api/groups/:groupID",
+        "DELETE /api/groups/:groupID",
+        "DELETE /api/groups/:groupID/membership",
         "POST /api/imports/parse-screenshot",
         "POST /api/admin/prices/refresh",
         "POST /api/groups/:groupID/prices/refresh",
@@ -207,6 +209,40 @@ async function routeRequest(request, response, store, context) {
     requireSessionForUser(data, memberID, request);
     const group = requireGroupAccess(data, groupID, memberID);
     return send(response, 200, { group });
+  }
+
+  if (request.method === "DELETE" && parts.length === 3) {
+    const memberID = requireMemberID(request);
+    const result = await store.update((data) => {
+      requireSessionForUser(data, memberID, request);
+      const group = requireGroupAccess(data, groupID, memberID);
+      requireGroupOwner(group, memberID);
+      removeGroupData(data, groupID);
+      return bootstrapForMember(data, memberID);
+    });
+    return send(response, 200, result);
+  }
+
+  if (request.method === "DELETE" && parts.length === 4 && parts[3] === "membership") {
+    const memberID = requireMemberID(request);
+    const result = await store.update((data) => {
+      requireSessionForUser(data, memberID, request);
+      const group = requireGroupAccess(data, groupID, memberID);
+      const member = group.members?.find((candidate) => candidate.id === memberID);
+      if (isGroupOwner(group, memberID) && (group.members?.length ?? 0) > 1) {
+        throw forbidden("GROUP_OWNER_CANNOT_LEAVE", "Group owner must disband the group or transfer ownership before leaving.");
+      }
+
+      if ((group.members?.length ?? 0) <= 1 || member?.role === "owner") {
+        removeGroupData(data, groupID);
+      } else {
+        group.members = group.members.filter((candidate) => candidate.id !== memberID);
+        removeMemberGroupData(data, groupID, memberID);
+      }
+
+      return bootstrapForMember(data, memberID);
+    });
+    return send(response, 200, result);
   }
 
   if (parts[3] === "analytics" && request.method === "GET" && parts.length === 4) {
@@ -506,6 +542,31 @@ function requireGroupAccess(data, groupID, memberID) {
     throw forbidden("GROUP_MEMBER_REQUIRED", "Only group members can access this group.");
   }
   return group;
+}
+
+function requireGroupOwner(group, memberID) {
+  if (!isGroupOwner(group, memberID)) {
+    throw forbidden("GROUP_OWNER_REQUIRED", "Only the group owner can disband this group.");
+  }
+}
+
+function isGroupOwner(group, memberID) {
+  const member = group.members?.find((candidate) => candidate.id === memberID);
+  return member?.role === "owner" || group.members?.[0]?.id === memberID;
+}
+
+function removeGroupData(data, groupID) {
+  data.groups = (data.groups ?? []).filter((group) => group.id !== groupID);
+  data.holdings = (data.holdings ?? []).filter((holding) => holding.groupID !== groupID);
+  data.holdingEvents = (data.holdingEvents ?? []).filter((event) => event.groupID !== groupID);
+  data.portfolioSnapshots = (data.portfolioSnapshots ?? []).filter((snapshot) => snapshot.groupID !== groupID);
+}
+
+function removeMemberGroupData(data, groupID, memberID) {
+  data.holdings = (data.holdings ?? []).filter((holding) => !(holding.groupID === groupID && holding.ownerID === memberID));
+  data.holdingEvents = (data.holdingEvents ?? []).filter((event) => !(event.groupID === groupID && event.ownerID === memberID));
+  data.portfolioSnapshots = (data.portfolioSnapshots ?? [])
+    .filter((snapshot) => !(snapshot.groupID === groupID && snapshot.ownerID === memberID));
 }
 
 function memberIDForRequest(request, body = {}) {
