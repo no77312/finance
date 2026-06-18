@@ -1601,6 +1601,53 @@ button.list-item.active {
   width: 100%;
 }
 
+.import-loading-card {
+  padding: 14px;
+  border-radius: 22px;
+  background: var(--accent-soft);
+  border: 1px solid rgba(0, 122, 255, 0.16);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.import-spinner {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 122, 255, 0.2);
+  border-top-color: var(--accent);
+  animation: import-spin 900ms linear infinite;
+}
+
+.import-loading-title {
+  font-size: 15px;
+  font-weight: 760;
+}
+
+.import-progress-track {
+  height: 6px;
+  margin-top: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(0, 122, 255, 0.14);
+}
+
+.import-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 240ms var(--ease-standard);
+}
+
+.import-loading-copy {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .import-warning-list {
   display: grid;
   gap: 6px;
@@ -1696,6 +1743,12 @@ button.list-item.active {
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes import-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 

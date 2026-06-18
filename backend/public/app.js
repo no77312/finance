@@ -22,6 +22,7 @@ const state = {
   editHoldingID: "",
   drafts: [],
   draftMeta: null,
+  importProgress: null,
   message: "",
   error: "",
   busy: false
@@ -85,6 +86,7 @@ function bindEvents() {
         state.editHoldingID = "";
         state.drafts = [];
         state.draftMeta = null;
+        state.importProgress = null;
         state.submitMode = "screenshot";
       }
       render();
@@ -946,6 +948,7 @@ function holdingFormHTML(group) {
 }
 
 function screenshotImportHTML() {
+  const importing = Boolean(state.importProgress?.active);
   return `
     <form id="screenshotForm" class="form-grid">
       <div class="two-col form-grid">
@@ -958,11 +961,34 @@ function screenshotImportHTML() {
       <label class="file-drop">
         <span class="file-drop-title">选择持仓截图</span>
         <span class="subtle">可一次选择多张截图；同券商账户按同代码覆盖，不同券商账户按同代码累计。</span>
-        <input name="images" type="file" accept="image/*" multiple required>
+        <input name="images" type="file" accept="image/*" multiple required ${importing ? "disabled" : ""}>
       </label>
-      <button class="primary-button" type="submit" ${state.busy ? "disabled" : ""}>解析截图</button>
+      <button class="primary-button" type="submit" ${state.busy ? "disabled" : ""}>${importing ? "识别中…" : "解析截图"}</button>
     </form>
+    ${importing ? importProgressHTML() : ""}
     ${draftsHTML()}
+  `;
+}
+
+function importProgressHTML() {
+  const progress = state.importProgress ?? {};
+  const current = Math.min(Number(progress.current ?? 1), Number(progress.total ?? 1));
+  const total = Math.max(Number(progress.total ?? 1), 1);
+  const percent = Math.max(8, Math.min(100, Math.round((current / total) * 100)));
+  const fileName = progress.fileName ? `：${progress.fileName}` : "";
+
+  return `
+    <section class="import-loading-card" aria-live="polite">
+      <div class="import-spinner" aria-hidden="true"></div>
+      <div class="min-w-0">
+        <div class="import-loading-title">${escapeHTML(progress.title || "正在识别截图")}</div>
+        <div class="subtle">${escapeHTML(`第 ${current}/${total} 张${fileName}`)}</div>
+        <div class="import-progress-track">
+          <div class="import-progress-fill" style="width:${percent}%"></div>
+        </div>
+        <div class="import-loading-copy">大模型正在读取图片、补全代码并整理持仓，请稍等。</div>
+      </div>
+    </section>
   `;
 }
 
@@ -1504,53 +1530,86 @@ async function parseScreenshot(formData, form) {
   }
 
   await runBusy(async () => {
-    const parsed = [];
-    const warnings = [];
-    const brokerHint = String(formData.get("brokerHint") ?? "").trim();
+    try {
+      const parsed = [];
+      const warnings = [];
+      const brokerHint = String(formData.get("brokerHint") ?? "").trim();
 
-    for (const [index, file] of files.entries()) {
-      const imageDataURL = await imageFileToDataURL(file);
-      const result = await api("/api/imports/parse-screenshot", {
-        method: "POST",
-        body: {
-          imageDataURL,
-          defaultVisibility: formData.get("defaultVisibility"),
-          brokerHint,
-          locale: navigator.language || "zh-Hans"
+      for (const [index, file] of files.entries()) {
+        updateImportProgress({
+          current: index + 1,
+          total: files.length,
+          fileName: file.name || `截图 ${index + 1}`,
+          title: "正在读取截图"
+        });
+        const imageDataURL = await imageFileToDataURL(file);
+
+        updateImportProgress({
+          current: index + 1,
+          total: files.length,
+          fileName: file.name || `截图 ${index + 1}`,
+          title: "正在识别持仓"
+        });
+        const result = await api("/api/imports/parse-screenshot", {
+          method: "POST",
+          body: {
+            imageDataURL,
+            defaultVisibility: formData.get("defaultVisibility"),
+            brokerHint,
+            locale: navigator.language || "zh-Hans"
+          }
+        });
+
+        const holdings = result.holdings ?? [];
+        parsed.push(...holdings.map((draft) => ({
+          ...draft,
+          importSource: file.name || `截图 ${index + 1}`,
+          importIndex: index + 1,
+          importSourceType: result.source || "unknown",
+          importBrokerHint: brokerHint
+        })));
+
+        for (const warning of result.warnings ?? []) {
+          warnings.push(`第 ${index + 1} 张：${warning}`);
         }
+      }
+
+      updateImportProgress({
+        current: files.length,
+        total: files.length,
+        title: "正在合并结果"
       });
 
-      const holdings = result.holdings ?? [];
-      parsed.push(...holdings.map((draft) => ({
-        ...draft,
-        importSource: file.name || `截图 ${index + 1}`,
-        importIndex: index + 1,
-        importSourceType: result.source || "unknown",
-        importBrokerHint: brokerHint
-      })));
+      const merged = mergeDrafts(parsed);
+      state.drafts = merged.drafts;
+      state.draftMeta = {
+        fileCount: files.length,
+        rawCount: parsed.length,
+        mergedCount: merged.drafts.length,
+        duplicateCount: merged.duplicateCount,
+        replacedCount: merged.replacedCount,
+        accumulatedCount: merged.accumulatedCount,
+        warnings
+      };
 
-      for (const warning of result.warnings ?? []) {
-        warnings.push(`第 ${index + 1} 张：${warning}`);
-      }
+      const copy = files.length > 1
+        ? `已解析 ${files.length} 张截图，合并 ${merged.drafts.length} 条持仓。`
+        : `识别到 ${merged.drafts.length} 条持仓。`;
+      state.importProgress = null;
+      setNotice("success", warnings[0] || copy);
+    } finally {
+      state.importProgress = null;
     }
-
-    const merged = mergeDrafts(parsed);
-    state.drafts = merged.drafts;
-    state.draftMeta = {
-      fileCount: files.length,
-      rawCount: parsed.length,
-      mergedCount: merged.drafts.length,
-      duplicateCount: merged.duplicateCount,
-      replacedCount: merged.replacedCount,
-      accumulatedCount: merged.accumulatedCount,
-      warnings
-    };
-
-    const copy = files.length > 1
-      ? `已解析 ${files.length} 张截图，合并 ${merged.drafts.length} 条持仓。`
-      : `识别到 ${merged.drafts.length} 条持仓。`;
-    setNotice("success", warnings[0] || copy);
   });
+}
+
+function updateImportProgress(nextProgress) {
+  state.importProgress = {
+    active: true,
+    ...state.importProgress,
+    ...nextProgress
+  };
+  render();
 }
 
 function mergeDrafts(drafts) {
@@ -1892,6 +1951,7 @@ function clearSession() {
   state.manageGroupID = "";
   state.drafts = [];
   state.draftMeta = null;
+  state.importProgress = null;
 }
 
 function normalizeBootstrap(data) {
@@ -1914,6 +1974,7 @@ function closeSheet() {
   state.editHoldingID = "";
   state.drafts = [];
   state.draftMeta = null;
+  state.importProgress = null;
   clearNotice();
   render();
 }
