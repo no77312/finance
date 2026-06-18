@@ -17,6 +17,7 @@ const state = {
   activeGroupID: "",
   selectedMemberID: "",
   sheet: "",
+  manageGroupID: "",
   submitMode: "screenshot",
   editHoldingID: "",
   drafts: [],
@@ -78,6 +79,7 @@ function bindEvents() {
 
     if (action === "sheet") {
       state.sheet = value;
+      state.manageGroupID = "";
       clearNotice();
       if (value === "submit") {
         state.editHoldingID = "";
@@ -85,6 +87,22 @@ function bindEvents() {
         state.draftMeta = null;
         state.submitMode = "screenshot";
       }
+      render();
+      return;
+    }
+
+    if (action === "manage-group") {
+      state.sheet = "group-manage";
+      state.manageGroupID = value;
+      clearNotice();
+      render();
+      return;
+    }
+
+    if (action === "back-groups") {
+      state.sheet = "groups";
+      state.manageGroupID = "";
+      clearNotice();
       render();
       return;
     }
@@ -766,6 +784,11 @@ function sheetHTML(group) {
     `;
   }
 
+  if (state.sheet === "group-manage") {
+    const managingGroup = groupByID(state.manageGroupID);
+    return managingGroup ? groupManageSheetHTML(managingGroup) : "";
+  }
+
   if (state.sheet === "submit" && group) {
     return submitSheetHTML(group);
   }
@@ -820,10 +843,6 @@ function groupMenuHTML(groups) {
 }
 
 function groupMenuItemHTML(group, active) {
-  const owner = isCurrentUserGroupOwner(group);
-  const action = owner ? "delete-group" : "leave-group";
-  const actionLabel = owner ? "解散" : "退出";
-  const actionClass = owner ? "danger-button" : "text-button";
   return `
     <div class="group-menu-item ${active ? "active" : ""}">
       <button class="group-menu-select" type="button" data-action="select-group" data-value="${escapeAttr(group.id)}" aria-pressed="${active ? "true" : "false"}">
@@ -836,7 +855,45 @@ function groupMenuItemHTML(group, active) {
         </div>
         <span class="pill ${active ? "blue" : ""}">${active ? "当前群组" : "切换"}</span>
       </button>
-      <button class="${actionClass} compact-button group-menu-action" type="button" data-action="${action}" data-value="${escapeAttr(group.id)}" ${state.busy ? "disabled" : ""}>${actionLabel}</button>
+      <button class="icon-button group-menu-action" type="button" data-action="manage-group" data-value="${escapeAttr(group.id)}" aria-label="管理 ${escapeAttr(group.name)}">···</button>
+    </div>
+  `;
+}
+
+function groupManageSheetHTML(group) {
+  const owner = isCurrentUserGroupOwner(group);
+  const action = owner ? "delete-group" : "leave-group";
+  const actionLabel = owner ? "解散群组" : "退出群组";
+  const description = owner
+    ? "解散后会删除该群组、全部成员持仓和历史记录。"
+    : "退出后会移除你在该群组的持仓和提交记录。";
+
+  return `
+    <div class="sheet">
+      <section class="sheet-panel">
+        <div class="sheet-header">
+          <button class="icon-button" type="button" data-action="back-groups" aria-label="返回">‹</button>
+          <h2 class="sheet-title">群组管理</h2>
+          <button class="icon-button" type="button" data-action="close-sheet" aria-label="关闭">×</button>
+        </div>
+        <section class="group-manage-card">
+          <div>
+            <div class="group-manage-name">${escapeHTML(group.name)}</div>
+            <div class="group-menu-item-meta">
+              <span>${group.members?.length ?? 0} 人</span>
+              ${group.inviteCode ? `<span>邀请码 ${escapeHTML(group.inviteCode)}</span>` : ""}
+            </div>
+          </div>
+          ${group.inviteCode
+            ? `<button class="secondary-button compact-button" type="button" data-action="copy-invite" data-value="${escapeAttr(group.inviteCode)}">复制邀请码</button>`
+            : ""}
+        </section>
+        <section class="form-panel danger-zone">
+          <h2 class="section-title">${escapeHTML(actionLabel)}</h2>
+          <div class="subtle">${escapeHTML(description)}</div>
+          <button class="danger-button" type="button" data-action="${action}" data-value="${escapeAttr(group.id)}" ${state.busy ? "disabled" : ""}>${escapeHTML(actionLabel)}</button>
+        </section>
+      </section>
     </div>
   `;
 }
@@ -1372,6 +1429,7 @@ async function leaveGroup(groupID) {
     state.activeGroupID = activeGroupIDAfterRemoval(previousActiveGroupID);
     state.selectedMemberID = "";
     state.sheet = "";
+    state.manageGroupID = "";
     setNotice("success", "已退出群组。");
   });
 }
@@ -1395,6 +1453,7 @@ async function deleteGroup(groupID) {
     state.activeGroupID = activeGroupIDAfterRemoval(previousActiveGroupID);
     state.selectedMemberID = "";
     state.sheet = "";
+    state.manageGroupID = "";
     setNotice("success", "群组已解散。");
   });
 }
@@ -1830,6 +1889,7 @@ function clearSession() {
   state.activeGroupID = "";
   state.selectedMemberID = "";
   state.sheet = "";
+  state.manageGroupID = "";
   state.drafts = [];
   state.draftMeta = null;
 }
@@ -1850,6 +1910,7 @@ function normalizeBootstrap(data) {
 
 function closeSheet() {
   state.sheet = "";
+  state.manageGroupID = "";
   state.editHoldingID = "";
   state.drafts = [];
   state.draftMeta = null;

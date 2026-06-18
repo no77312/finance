@@ -1071,7 +1071,10 @@ button.list-item.active {
 
 .group-menu-action {
   justify-self: end;
-  min-width: 64px;
+  width: 38px;
+  min-height: 38px;
+  padding: 0;
+  color: var(--muted);
 }
 
 .group-menu-item.active {
@@ -1094,6 +1097,29 @@ button.list-item.active {
   margin-top: 4px;
   color: var(--muted);
   font-size: 13px;
+}
+
+.group-manage-card {
+  padding: 16px;
+  border-radius: 24px;
+  background: var(--control);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.group-manage-name {
+  font-size: 20px;
+  font-weight: 760;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.danger-zone {
+  gap: 12px;
+  border-color: #ffd1cf;
 }
 
 .avatar-stack {
@@ -1698,7 +1724,11 @@ button.list-item.active {
   }
 
   .group-menu-action {
-    justify-self: stretch;
+    justify-self: end;
+  }
+
+  .group-manage-card {
+    grid-template-columns: 1fr;
   }
 
   .exposure-card .holding-card-head {
