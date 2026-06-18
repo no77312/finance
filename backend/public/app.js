@@ -871,7 +871,7 @@ function groupManageSheetHTML(group) {
   return `
     <div class="sheet">
       <section class="sheet-panel">
-        <div class="sheet-header">
+        <div class="sheet-header sheet-header-nav">
           <button class="icon-button" type="button" data-action="back-groups" aria-label="返回">‹</button>
           <h2 class="sheet-title">群组管理</h2>
           <button class="icon-button" type="button" data-action="close-sheet" aria-label="关闭">×</button>
