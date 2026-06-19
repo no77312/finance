@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { useStore } from '../store/StoreContext.jsx'
+import { useStore } from '../store/useStore.js'
 import { Avatar } from '../components/Avatar.jsx'
 import Icon from '../components/Icon.jsx'
 import PortfolioSection from '../components/PortfolioSection.jsx'

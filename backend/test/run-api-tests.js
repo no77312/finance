@@ -125,7 +125,8 @@ async function generatesGroupAdviceWithDailyCache() {
     assert.equal(first.cached, false);
     assert.equal(typeof first.advice.headline, "string");
     assert.ok(first.advice.summary.length > 0);
-    assert.ok(Array.isArray(first.advice.highlights));
+    assert.ok(Array.isArray(first.advice.members));
+    assert.ok(first.advice.members.length > 0);
 
     const second = await getJson(`/api/groups/${groupID}/advice`);
     assert.equal(second.cached, true);

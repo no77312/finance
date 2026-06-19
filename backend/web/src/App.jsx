@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
-import { StoreProvider, useStore } from './store/StoreContext.jsx'
+import { StoreProvider } from './store/StoreContext.jsx'
+import { useStore } from './store/useStore.js'
 import { api } from './api/client.js'
 import LoginView from './views/LoginView.jsx'
 import AppView from './views/AppView.jsx'

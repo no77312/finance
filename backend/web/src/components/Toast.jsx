@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { useStore } from '../store/StoreContext.jsx'
+import { useStore } from '../store/useStore.js'
 
 // 顶部 toast，带进出场动画
 export default function Toast() {

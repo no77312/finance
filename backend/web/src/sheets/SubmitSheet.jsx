@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { useStore, activeGroupFor } from '../store/StoreContext.jsx'
+import { useStore } from '../store/useStore.js'
+import { activeGroupFor } from '../store/selectors.js'
 import Sheet, { SheetHeader } from './Sheet.jsx'
 import { markets, currencies, visibilities } from '../utils/finance.js'
 import { imageFileToDataURL, mergeDrafts, isImportableDraft } from '../utils/screenshot.js'
@@ -269,6 +270,9 @@ function Drafts({ group }) {
     const next = drafts.map((d, i) => (i === index ? { ...d, [field]: value } : d))
     actions.patch({ drafts: next })
   }
+  const removeDraft = (index) => {
+    actions.patch({ drafts: drafts.filter((_, i) => i !== index) })
+  }
 
   return (
     <section className="section">
@@ -312,7 +316,12 @@ function Drafts({ group }) {
                       <span>置信度 {formatPercent(draft.confidence ?? 0)}</span>
                     </div>
                   </div>
-                  <span className={`pill ${importable ? 'green' : 'red'}`}>{importable ? '可导入' : '需核对'}</span>
+                  <div className="draft-card-actions">
+                    <span className={`pill ${importable ? 'green' : 'red'}`}>{importable ? '可导入' : '需核对'}</span>
+                    <button className="ghost-icon-button danger-text" type="button" onClick={() => removeDraft(index)} aria-label="移除草稿">
+                      ×
+                    </button>
+                  </div>
                 </div>
                 <div className="draft-edit-grid">
                   <label className="field">
@@ -330,6 +339,34 @@ function Drafts({ group }) {
                   <label className="field">
                     <span>现价</span>
                     <input type="number" step="any" value={draft.lastPrice ?? ''} onChange={(e) => updateDraft(index, 'lastPrice', e.target.value)} />
+                  </label>
+                  <label className="field">
+                    <span>成本价（可选）</span>
+                    <input type="number" step="any" value={draft.averageCost ?? ''} onChange={(e) => updateDraft(index, 'averageCost', e.target.value)} />
+                  </label>
+                  <label className="field">
+                    <span>市场</span>
+                    <select value={draft.market || 'usStock'} onChange={(e) => updateDraft(index, 'market', e.target.value)}>
+                      {markets.map((m) => (
+                        <option key={m.value} value={m.value}>{m.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>币种</span>
+                    <select value={draft.currency || 'USD'} onChange={(e) => updateDraft(index, 'currency', e.target.value)}>
+                      {currencies.map((c) => (
+                        <option key={c.value} value={c.value}>{c.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>可见性</span>
+                    <select value={draft.visibility || 'amountOnly'} onChange={(e) => updateDraft(index, 'visibility', e.target.value)}>
+                      {visibilities.map((v) => (
+                        <option key={v.value} value={v.value}>{v.label}</option>
+                      ))}
+                    </select>
                   </label>
                 </div>
               </motion.article>

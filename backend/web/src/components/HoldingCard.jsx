@@ -1,26 +1,14 @@
 import { motion } from 'framer-motion'
 import Icon from './Icon.jsx'
 import { WeightBar } from './Visuals.jsx'
-import { money, formatNumber, formatMaybe, signedMoney, formatPercent, classForNumber } from '../utils/format.js'
+import { money, formatNumber, signedMoney, formatPercent, classForNumber } from '../utils/format.js'
 import {
   holdingMarketValueUSD,
   holdingCostBasisUSD,
   canSeeValues,
   canSeeCost,
-  isMine,
   labelForMarket,
-  visibilities,
 } from '../utils/finance.js'
-
-function privacyPill(visibility) {
-  const map = {
-    full: { label: '完整可见', cls: 'green' },
-    amountOnly: { label: '隐藏成本', cls: 'blue' },
-    symbolOnly: { label: '仅标的', cls: '' },
-  }
-  const v = map[visibility] ?? { label: visibility, cls: '' }
-  return <span className={`pill ${v.cls}`}>{v.label}</span>
-}
 
 // 单个持仓卡片，支持 hover/tap 微交互、layout 动画
 export default function HoldingCard({ holding, currentMemberID, weight, editable, onEdit, onDelete }) {
@@ -100,5 +88,3 @@ function Stat({ label, value, cls = '' }) {
     </div>
   )
 }
-
-export { privacyPill }

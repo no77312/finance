@@ -1971,6 +1971,42 @@ button.list-item.active {
   gap: 14px;
 }
 
+.draft-card-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ghost-icon-button {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--control);
+  color: var(--muted);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background 180ms var(--ease-standard),
+    color 180ms var(--ease-standard),
+    transform 180ms var(--ease-standard);
+}
+
+.ghost-icon-button:hover {
+  background: var(--control-strong);
+}
+
+.ghost-icon-button.danger-text {
+  color: var(--red);
+}
+
 .draft-edit-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2737,4 +2773,3 @@ button.list-item.active {
   line-height: 1.55;
   color: var(--ink);
 }
-

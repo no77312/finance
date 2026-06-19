@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { useStore } from '../store/StoreContext.jsx'
+import { useStore } from '../store/useStore.js'
 import Sheet, { SheetHeader } from './Sheet.jsx'
 import Icon from '../components/Icon.jsx'
 

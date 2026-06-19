@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { useStore, activeGroupFor } from '../store/StoreContext.jsx'
+import { useStore } from '../store/useStore.js'
+import { activeGroupFor } from '../store/selectors.js'
 import Icon from '../components/Icon.jsx'
 import OverviewView from './OverviewView.jsx'
 import MembersView from './MembersView.jsx'

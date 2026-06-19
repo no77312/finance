@@ -37,6 +37,12 @@ function draftAccountKey(draft) {
   return `screenshot-${draft.importIndex ?? 0}`
 }
 
+function finiteOptionalNumber(value) {
+  if (value === '' || value === null || value === undefined) return null
+  const number = Number(value)
+  return Number.isFinite(number) ? number : null
+}
+
 // 合并草稿：同账户覆盖 + 跨券商累计
 export function mergeDrafts(drafts) {
   let replacedCount = 0
@@ -63,11 +69,15 @@ export function mergeDrafts(drafts) {
     const qtyA = Number(existing.quantity) || 0
     const qtyB = Number(draft.quantity) || 0
     const totalQty = qtyA + qtyB
-    const costA = Number(existing.averageCost)
-    const costB = Number(draft.averageCost)
-    let averageCost = existing.averageCost
-    if (Number.isFinite(costA) && Number.isFinite(costB) && totalQty > 0) {
+    const costA = finiteOptionalNumber(existing.averageCost)
+    const costB = finiteOptionalNumber(draft.averageCost)
+    let averageCost = null
+    if (costA !== null && costB !== null && totalQty > 0) {
       averageCost = (costA * qtyA + costB * qtyB) / totalQty
+    } else if (costA !== null && qtyB === 0) {
+      averageCost = costA
+    } else if (costB !== null && qtyA === 0) {
+      averageCost = costB
     }
     bySymbol.set(key, {
       ...existing,

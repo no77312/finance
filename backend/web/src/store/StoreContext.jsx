@@ -1,7 +1,6 @@
-import { createContext, useContext, useCallback, useMemo, useReducer, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react'
 import { api, loadSession, saveSession, removeSession } from '../api/client.js'
-
-const StoreContext = createContext(null)
+import { StoreContext } from './context.js'
 
 const initialState = {
   config: null,
@@ -37,11 +36,6 @@ function reducer(state, action) {
   }
 }
 
-export function activeGroupFor(state) {
-  const groups = state.data?.groups ?? []
-  return groups.find((group) => group.id === state.activeGroupID) ?? groups[0] ?? null
-}
-
 function normalizeBootstrap(state, data) {
   // 若返回了最新 user，回写进 session 持久化
   if (data?.user && state.session) {
@@ -60,8 +54,11 @@ function normalizeBootstrap(state, data) {
 export function StoreProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState)
   const stateRef = useRef(state)
-  stateRef.current = state
   const noticeTimer = useRef(0)
+
+  useEffect(() => {
+    stateRef.current = state
+  }, [state])
 
   const patch = useCallback((payload) => dispatch({ type: 'patch', payload }), [])
 
@@ -372,10 +369,4 @@ export function StoreProvider({ children }) {
 
   const value = useMemo(() => ({ state, actions }), [state, actions])
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
-}
-
-export function useStore() {
-  const ctx = useContext(StoreContext)
-  if (!ctx) throw new Error('useStore must be used within StoreProvider')
-  return ctx
 }

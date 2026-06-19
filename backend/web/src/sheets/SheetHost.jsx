@@ -1,5 +1,5 @@
 import { AnimatePresence } from 'framer-motion'
-import { useStore } from '../store/StoreContext.jsx'
+import { useStore } from '../store/useStore.js'
 import GroupsSheet from './GroupsSheet.jsx'
 import GroupManageSheet from './GroupManageSheet.jsx'
 import MemberSelectSheet from './MemberSelectSheet.jsx'
