@@ -17,7 +17,7 @@ const TABS = [
 const TAB_INDEX = { overview: 0, members: 1, mine: 2 }
 
 const SPRING = { type: 'spring', stiffness: 430, damping: 38, mass: 0.72 }
-const PAGE_TRANSITION = { duration: 0.24, ease: [0.16, 1, 0.3, 1] }
+const PAGE_TRANSITION = { duration: 0.12, ease: [0.16, 1, 0.3, 1] }
 
 export default function AppView() {
   const { state } = useStore()
@@ -35,13 +35,13 @@ export default function AppView() {
       {group ? (
         <LayoutGroup id={`group-${group.id}`}>
           <div className="page-viewport">
-            <AnimatePresence mode="wait" initial={false}>
+            <AnimatePresence initial={false}>
               <motion.div
                 key={state.activeTab}
                 className="page-slide"
-                initial={{ opacity: 0, y: 8, scale: 0.996 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -5, scale: 0.998 }}
+                initial={{ opacity: 0, y: 2 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -2, position: 'absolute' }}
                 transition={PAGE_TRANSITION}
               >
                 {state.activeTab === 'members' ? (
