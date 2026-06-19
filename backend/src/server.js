@@ -1,10 +1,7 @@
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
-import { createReadStream } from "node:fs";
-import { stat } from "node:fs/promises";
-import { dirname, extname, join, normalize, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { OAuth2Client } from "google-auth-library";
+import { requirePriceRefreshToken, verifyGoogleCredential } from "./auth.js";
+import { loadRuntimeConfig } from "./config.js";
 import {
   badRequest,
   createHoldingEvent,
@@ -23,16 +20,22 @@ import {
   summariesByCurrency
 } from "./domain.js";
 import { generateGroupAdvice } from "./groupAdvice.js";
+import { readJsonBody, send, sendError } from "./http.js";
 import { parseScreenshotImport } from "./importParser.js";
 import { refreshHoldingsWithPreviousClose } from "./marketData.js";
+import { serveStaticAsset } from "./staticAssets.js";
 
-const moduleDir = dirname(fileURLToPath(import.meta.url));
-const defaultPublicDir = resolve(moduleDir, "..", "public");
-
-export function createPositionCircleServer({ store, publicDir = defaultPublicDir, verifyGoogleIDToken = verifyGoogleCredential }) {
+export function createPositionCircleServer(options) {
+  const config = options.config ?? loadRuntimeConfig();
+  const context = {
+    config,
+    publicDir: options.publicDir ?? config.publicDir,
+    verifyGoogleIDToken: options.verifyGoogleIDToken ?? ((body) => verifyGoogleCredential(body, config))
+  };
+  const { store } = options;
   return createServer(async (request, response) => {
     try {
-      await routeRequest(request, response, store, { publicDir, verifyGoogleIDToken });
+      await routeRequest(request, response, store, context);
     } catch (error) {
       sendError(response, error);
     }
@@ -55,7 +58,7 @@ async function routeRequest(request, response, store, context) {
 
   if (request.method === "GET" && url.pathname === "/api/config") {
     return send(response, 200, {
-      googleClientID: process.env.GOOGLE_CLIENT_ID ?? ""
+      googleClientID: context.config.googleClientID
     });
   }
 
@@ -169,7 +172,7 @@ async function routeRequest(request, response, store, context) {
   }
 
   if (parts[1] === "admin" && request.method === "POST" && parts.length === 4 && parts[2] === "prices" && parts[3] === "refresh") {
-    requirePriceRefreshToken(request);
+    requirePriceRefreshToken(request, context.config);
 
     const result = await store.update(async (data) => {
       const refreshResult = await refreshHoldingsWithPreviousClose(data.holdings);
@@ -296,7 +299,7 @@ async function routeRequest(request, response, store, context) {
       const group = requireGroupAccess(data, groupID, memberID);
       data.groupAdvice ??= [];
 
-      const date = dayKey();
+      const date = dayKey(new Date(), context.config.appTimeZone);
       const existing = data.groupAdvice.find((record) => (
         record.groupID === groupID
         && record.memberID === memberID
@@ -338,7 +341,7 @@ async function routeRequest(request, response, store, context) {
   }
 
   if (parts[3] === "prices" && parts[4] === "refresh" && request.method === "POST" && parts.length === 5) {
-    requirePriceRefreshToken(request);
+    requirePriceRefreshToken(request, context.config);
 
     const result = await store.update(async (data) => {
       const memberID = memberIDForRequest(request);
@@ -661,8 +664,7 @@ function invalidateGroupAdvice(data, groupID) {
   data.groupAdvice = (data.groupAdvice ?? []).filter((record) => record.groupID !== groupID);
 }
 
-function dayKey(date = new Date()) {
-  const timeZone = process.env.APP_TIME_ZONE || "Asia/Shanghai";
+function dayKey(date = new Date(), timeZone = "Asia/Shanghai") {
   const parts = new Intl.DateTimeFormat("en", {
     timeZone,
     year: "numeric",
@@ -695,65 +697,6 @@ function requireSessionForUser(data, memberID, request) {
   if (!userSessions.some((session) => session.token === providedToken)) {
     throw forbidden("SESSION_REQUIRED", "Valid session token is required.");
   }
-}
-
-function requirePriceRefreshToken(request) {
-  const expectedToken = process.env.PRICE_REFRESH_TOKEN;
-  if (!expectedToken) {
-    throw forbidden("PRICE_REFRESH_NOT_CONFIGURED", "Set PRICE_REFRESH_TOKEN to enable scheduled price refresh.");
-  }
-
-  const providedToken = bearerToken(request.headers.authorization) ?? request.headers["x-refresh-token"];
-  if (providedToken !== expectedToken) {
-    throw forbidden("PRICE_REFRESH_FORBIDDEN", "Invalid price refresh token.");
-  }
-}
-
-async function verifyGoogleCredential(body) {
-  const credential = cleanString(body.credential ?? body.idToken ?? body.token);
-  if (!credential) {
-    throw badRequest("GOOGLE_CREDENTIAL_REQUIRED", "Google credential is required.");
-  }
-
-  const clientID = process.env.GOOGLE_CLIENT_ID;
-  if (!clientID) {
-    throw forbidden("GOOGLE_CLIENT_ID_REQUIRED", "Set GOOGLE_CLIENT_ID to enable Google sign-in.");
-  }
-
-  let payload;
-  try {
-    const client = new OAuth2Client(clientID);
-    const ticket = await client.verifyIdToken({
-      idToken: credential,
-      audience: clientID
-    });
-    payload = ticket.getPayload();
-  } catch {
-    throw forbidden("GOOGLE_CREDENTIAL_INVALID", "Google credential is invalid.");
-  }
-
-  if (!payload?.sub) {
-    throw badRequest("GOOGLE_USER_REQUIRED", "Google user identifier is required.");
-  }
-
-  if (payload.email_verified === false) {
-    throw forbidden("GOOGLE_EMAIL_UNVERIFIED", "Google email is not verified.");
-  }
-
-  return {
-    googleUserID: payload.sub,
-    email: payload.email ?? "",
-    fullName: payload.name ?? payload.email ?? "Google 用户",
-    pictureURL: payload.picture ?? ""
-  };
-}
-
-function bearerToken(value) {
-  if (typeof value !== "string") {
-    return undefined;
-  }
-  const [scheme, token] = value.split(" ");
-  return scheme?.toLowerCase() === "bearer" && token ? token : undefined;
 }
 
 function appendHoldingEvent(data, event) {
@@ -847,140 +790,6 @@ function replaceHolding(data, nextHolding) {
   data.holdings[index] = nextHolding;
 }
 
-async function serveStaticAsset(pathname, response, publicDir) {
-  const publicRoot = resolve(publicDir);
-  const decodedPath = safeDecodePath(pathname);
-  const assetPath = decodedPath === "/" ? "index.html" : normalize(decodedPath).replace(/^[/\\]+/, "");
-  const requestedFile = resolve(publicRoot, assetPath);
-
-  if (!isPathInside(publicRoot, requestedFile)) {
-    throw forbidden("STATIC_ASSET_FORBIDDEN", "Static asset path is not allowed.");
-  }
-
-  const filePath = await existingStaticFile(requestedFile, publicRoot, extname(assetPath) === "");
-  if (!filePath) {
-    throw notFound("STATIC_ASSET_NOT_FOUND", "Static asset not found.");
-  }
-
-  response.statusCode = 200;
-  response.setHeader("Content-Type", contentTypeForPath(filePath));
-  response.setHeader("Cache-Control", cacheControlForPath(filePath));
-
-  await new Promise((resolveStream, rejectStream) => {
-    const stream = createReadStream(filePath);
-    stream.on("error", rejectStream);
-    stream.on("end", resolveStream);
-    stream.pipe(response);
-  });
-}
-
-async function existingStaticFile(requestedFile, publicRoot, shouldFallbackToIndex) {
-  const directFile = await statFile(requestedFile);
-  if (directFile) {
-    return directFile;
-  }
-
-  if (!shouldFallbackToIndex) {
-    return null;
-  }
-
-  const indexFile = join(publicRoot, "index.html");
-  return statFile(indexFile);
-}
-
-async function statFile(filePath) {
-  try {
-    const stats = await stat(filePath);
-    return stats.isFile() ? filePath : null;
-  } catch {
-    return null;
-  }
-}
-
-function safeDecodePath(pathname) {
-  try {
-    return decodeURIComponent(pathname);
-  } catch {
-    throw badRequest("INVALID_PATH", "Request path is invalid.");
-  }
-}
-
-function isPathInside(parent, child) {
-  const normalizedParent = parent.endsWith("/") ? parent : `${parent}/`;
-  return child === parent || child.startsWith(normalizedParent);
-}
-
-function contentTypeForPath(filePath) {
-  switch (extname(filePath).toLowerCase()) {
-  case ".css":
-    return "text/css; charset=utf-8";
-  case ".js":
-    return "text/javascript; charset=utf-8";
-  case ".json":
-  case ".webmanifest":
-    return "application/manifest+json; charset=utf-8";
-  case ".svg":
-    return "image/svg+xml; charset=utf-8";
-  case ".png":
-    return "image/png";
-  case ".html":
-    return "text/html; charset=utf-8";
-  default:
-    return "application/octet-stream";
-  }
-}
-
-function cacheControlForPath(filePath) {
-  return /\/(?:app|styles|sw)\.js$|\.css$|\.html$/.test(filePath)
-    ? "no-cache"
-    : "public, max-age=31536000, immutable";
-}
-
-async function readJsonBody(request) {
-  let raw = "";
-  for await (const chunk of request) {
-    raw += chunk;
-    if (raw.length > 7 * 1024 * 1024) {
-      throw badRequest("BODY_TOO_LARGE", "Request body is too large.");
-    }
-  }
-
-  if (!raw.trim()) {
-    return {};
-  }
-
-  try {
-    return JSON.parse(raw);
-  } catch {
-    throw badRequest("INVALID_JSON", "Request body must be valid JSON.");
-  }
-}
-
 function cleanString(value) {
   return typeof value === "string" ? value.trim() : "";
-}
-
-function send(response, statusCode, body) {
-  response.statusCode = statusCode;
-  response.setHeader("Access-Control-Allow-Origin", "*");
-  response.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-  response.setHeader("Access-Control-Allow-Headers", "Authorization,Content-Type,X-Member-ID,X-Refresh-Token,X-Session-Token");
-
-  if (body === undefined) {
-    response.end();
-    return;
-  }
-
-  response.setHeader("Content-Type", "application/json; charset=utf-8");
-  response.end(JSON.stringify(body));
-}
-
-function sendError(response, error) {
-  const statusCode = error.status ?? 500;
-  send(response, statusCode, {
-    error: {
-      code: error.code ?? "INTERNAL_ERROR",
-      message: statusCode === 500 ? "Internal server error." : error.message
-    }
-  });
 }
