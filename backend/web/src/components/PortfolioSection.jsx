@@ -18,6 +18,8 @@ export default function PortfolioSection({
   onEdit,
   onDelete,
 }) {
+  const toneBySymbol = new Map(insights.topSlices.map((slice, index) => [slice.symbol, index]))
+
   return (
     <section className="section">
       <div className="section-header">
@@ -78,13 +80,14 @@ export default function PortfolioSection({
             insights.holdings.map((holding, index) => {
               const mv = holdingMarketValueUSD(holding)
               const weight = insights.totalVisibleValue > 0 ? mv / insights.totalVisibleValue : 0
+              const toneIndex = toneBySymbol.get(holding.symbol) ?? index
               return (
                 <HoldingCard
                   key={holding.id}
                   holding={holding}
                   currentMemberID={currentMemberID}
                   weight={weight}
-                  toneIndex={index}
+                  toneIndex={toneIndex}
                   editable={editable}
                   onEdit={onEdit}
                   onDelete={onDelete}

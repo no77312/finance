@@ -52,7 +52,7 @@ function Root() {
     const open = Boolean(state.sheet)
     document.documentElement.classList.toggle('sheet-open', open)
     const meta = document.querySelector('meta[name="theme-color"]')
-    if (meta) meta.setAttribute('content', open ? '#f2f2f7' : '#ffffff')
+    if (meta) meta.setAttribute('content', open ? '#f5f6f8' : '#ffffff')
   }, [state.sheet])
 
   if (state.booting) {
