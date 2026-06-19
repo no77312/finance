@@ -107,8 +107,11 @@ export function StoreProvider({ children }) {
     const normalized = normalizeBootstrap(current, data)
     const groups = normalized.groups
     const stillThere = groups.some((g) => g.id === current.activeGroupID)
+    const session = current.session && data.user ? { ...current.session, user: data.user } : current.session
+    if (session !== current.session) saveSession(session)
     patch({
       data: normalized,
+      session,
       adviceByGroupID: {},
       activeGroupID: stillThere ? current.activeGroupID : groups[0]?.id ?? '',
     })
@@ -323,6 +326,18 @@ export function StoreProvider({ children }) {
     [setNotice],
   )
 
+  // ---- 个人资料 ----
+  const updateProfile = useCallback(
+    (form) =>
+      runBusy(async () => {
+        await callApi('/api/me', { method: 'PATCH', body: form })
+        await refreshBootstrap()
+        patch({ sheet: '' })
+        setNotice('success', '资料已更新')
+      }),
+    [runBusy, callApi, refreshBootstrap, patch, setNotice],
+  )
+
   const actions = useMemo(
     () => ({
       patch,
@@ -344,11 +359,12 @@ export function StoreProvider({ children }) {
       importDrafts,
       loadGroupAdvice,
       copyInviteCode,
+      updateProfile,
     }),
     [
       patch, getState, callApi, setNotice, clearNotice, runBusy, refreshBootstrap, clearSession,
       signInWithGoogle, signInWithDevice, createGroup, joinGroup, leaveGroup, deleteGroup, saveHolding,
-      deleteHolding, importDrafts, loadGroupAdvice, copyInviteCode,
+      deleteHolding, importDrafts, loadGroupAdvice, copyInviteCode, updateProfile,
     ],
   )
 

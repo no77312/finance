@@ -66,6 +66,35 @@ async function routeRequest(request, response, store, context) {
     return send(response, 200, bootstrapForMember(data, memberID));
   }
 
+  if ((request.method === "PATCH" || request.method === "PUT") && url.pathname === "/api/me") {
+    const body = await readJsonBody(request);
+    const memberID = requireMemberID(request, body);
+    const result = await store.update((data) => {
+      requireSessionForUser(data, memberID, request);
+      const user = data.users?.find((candidate) => candidate.id === memberID);
+      if (!user) {
+        throw notFound("USER_NOT_FOUND", "User not found.");
+      }
+      if (Object.prototype.hasOwnProperty.call(body, "displayName")) {
+        const name = String(body.displayName ?? "").trim().slice(0, 40);
+        if (name) user.displayName = name;
+      }
+      if (Object.prototype.hasOwnProperty.call(body, "bio")) {
+        user.bio = String(body.bio ?? "").trim().slice(0, 160);
+      }
+      for (const group of data.groups ?? []) {
+        for (const member of group.members ?? []) {
+          if (member.id === memberID) {
+            member.displayName = user.displayName;
+            member.bio = user.bio ?? "";
+          }
+        }
+      }
+      return bootstrapForMember(data, memberID, user);
+    });
+    return send(response, 200, result);
+  }
+
   const parts = url.pathname.split("/").filter(Boolean);
   if (parts[0] !== "api") {
     return serveStaticAsset(url.pathname, response, context.publicDir);

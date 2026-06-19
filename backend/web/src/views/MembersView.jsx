@@ -29,6 +29,7 @@ export default function MembersView({ group }) {
           <span className="min-w-0">
             <span className="member-selector-hint">查看成员 · 点击切换</span>
             <span className="member-selector-name">{selected?.displayName ?? '选择成员'}</span>
+            {selected?.bio && <span className="member-selector-bio">{selected.bio}</span>}
           </span>
         </span>
         <span className="member-selector-value">
@@ -46,6 +47,7 @@ export default function MembersView({ group }) {
           insights={insights}
           owner={selected}
           currentMemberID={memberID}
+          resetKey={selectedID}
         />
       )}
     </main>

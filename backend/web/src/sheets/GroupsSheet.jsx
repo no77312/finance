@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useStore } from '../store/StoreContext.jsx'
 import Sheet, { SheetHeader } from './Sheet.jsx'
+import Icon from '../components/Icon.jsx'
 
 // 创建/加入群组表单（也用于空工作区）
 export function GroupForms() {
@@ -13,40 +14,63 @@ export function GroupForms() {
   return (
     <div className="group-forms">
       <form
-        className="form-panel"
+        className="group-form-card"
         onSubmit={(e) => {
           e.preventDefault()
           actions.createGroup({ name, subtitle })
         }}
       >
-        <h3>创建群组</h3>
+        <div className="group-form-head">
+          <span className="group-form-icon create" aria-hidden="true">
+            <Icon name="plus" size={18} />
+          </span>
+          <div>
+            <strong>创建群组</strong>
+            <span className="subtle">建一个圈子，邀请好友共享持仓</span>
+          </div>
+        </div>
         <label className="field">
           <span>群组名称</span>
-          <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="例如：核心持仓圈" />
+          <input value={name} onChange={(e) => setName(e.target.value)} required maxLength={24} placeholder="例如：核心持仓圈" />
         </label>
         <label className="field">
-          <span>副标题</span>
-          <input value={subtitle} onChange={(e) => setSubtitle(e.target.value)} />
+          <span>一句话简介（选填）</span>
+          <input value={subtitle} onChange={(e) => setSubtitle(e.target.value)} maxLength={40} placeholder="共享持仓与观点" />
         </label>
-        <motion.button className="primary-button" whileTap={{ scale: 0.97 }} disabled={state.busy}>
-          创建
+        <motion.button className="primary-button" whileTap={{ scale: 0.97 }} disabled={state.busy || !name.trim()}>
+          创建群组
         </motion.button>
       </form>
 
       <form
-        className="form-panel"
+        className="group-form-card"
         onSubmit={(e) => {
           e.preventDefault()
           actions.joinGroup({ inviteCode })
         }}
       >
-        <h3>加入群组</h3>
+        <div className="group-form-head">
+          <span className="group-form-icon join" aria-hidden="true">
+            <Icon name="layers" size={18} />
+          </span>
+          <div>
+            <strong>加入群组</strong>
+            <span className="subtle">输入好友分享的邀请码</span>
+          </div>
+        </div>
         <label className="field">
           <span>邀请码</span>
-          <input value={inviteCode} onChange={(e) => setInviteCode(e.target.value.toUpperCase())} required placeholder="输入 6 位邀请码" />
+          <input
+            className="invite-code-input"
+            value={inviteCode}
+            onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+            required
+            maxLength={8}
+            placeholder="6 位邀请码"
+          />
         </label>
-        <motion.button className="secondary-button" whileTap={{ scale: 0.97 }} disabled={state.busy}>
-          加入
+        <motion.button className="secondary-button" whileTap={{ scale: 0.97 }} disabled={state.busy || !inviteCode.trim()}>
+          加入群组
         </motion.button>
       </form>
     </div>

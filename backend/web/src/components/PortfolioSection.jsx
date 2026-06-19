@@ -13,6 +13,7 @@ export default function PortfolioSection({
   owner,
   currentMemberID,
   editable,
+  resetKey,
   onAddHolding,
   onEdit,
   onDelete,
@@ -67,7 +68,7 @@ export default function PortfolioSection({
         </div>
       </motion.div>
 
-      <div className="list">
+      <div className="list" key={resetKey}>
         <AnimatePresence mode="popLayout" initial={false}>
           {insights.holdings.length === 0 ? (
             <motion.div key="empty" className="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>

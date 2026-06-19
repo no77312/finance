@@ -19,14 +19,21 @@ export default function MineView({ group }) {
 
   const eventLabel = { created: '提交', updated: '调整', deleted: '移除' }
 
+  const logout = () => {
+    if (window.confirm('确定退出登录？')) actions.clearSession()
+  }
+
   return (
     <main className="content">
       <section className="section-wide">
-        <motion.div
-          className="panel profile-card"
+        <motion.button
+          type="button"
+          className="panel profile-card profile-card-button"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.25 }}
+          whileTap={{ scale: 0.99 }}
+          onClick={() => actions.patch({ sheet: 'profile-edit' })}
         >
           <div className="profile-card-head">
             <div className="member-overview-name">
@@ -36,15 +43,23 @@ export default function MineView({ group }) {
                 <div className="account-mail">{user?.email ?? ''}</div>
               </div>
             </div>
-            <motion.button className="icon-button profile-close-button" whileTap={{ scale: 0.9 }} onClick={actions.clearSession} aria-label="退出登录">
-              <Icon name="close" size={18} />
-            </motion.button>
+            <span className="profile-card-chevron">
+              <Icon name="chevron" size={18} />
+            </span>
           </div>
+          {user?.bio ? (
+            <p className="profile-bio">{user.bio}</p>
+          ) : (
+            <p className="profile-bio profile-bio-empty">点击添加个人简介</p>
+          )}
           <div className="profile-meta-row">
             <span>当前群组 {group.name}</span>
             <span>已加入 {state.data?.groups?.length ?? 0} 个群组</span>
           </div>
-        </motion.div>
+        </motion.button>
+        <button type="button" className="text-link-button profile-logout-link" onClick={logout}>
+          退出登录
+        </button>
       </section>
 
       <PortfolioSection

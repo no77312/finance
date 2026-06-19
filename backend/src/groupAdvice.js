@@ -13,20 +13,23 @@ const adviceSchema = {
   properties: {
     headline: { type: "string" },
     summary: { type: "string" },
-    highlights: {
+    members: {
       type: "array",
-      items: { type: "string" }
-    },
-    risks: {
-      type: "array",
-      items: { type: "string" }
-    },
-    questions: {
-      type: "array",
-      items: { type: "string" }
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          name: { type: "string" },
+          healthLabel: { type: "string" },
+          healthScore: { type: "integer" },
+          health: { type: "string" },
+          strategy: { type: "string" }
+        },
+        required: ["name", "healthLabel", "healthScore", "health", "strategy"]
+      }
     }
   },
-  required: ["headline", "summary", "highlights", "risks", "questions"]
+  required: ["headline", "summary", "members"]
 };
 
 export async function generateGroupAdvice({ group, holdings, requesterID }) {
@@ -111,8 +114,45 @@ function buildAdviceProfile(group, holdings, requesterID) {
         marketValueUSD: round(item.marketValueUSD),
         weight: totalVisibleMarketValue ? roundRatio(item.marketValueUSD / totalVisibleMarketValue) : 0
       })),
+    memberProfiles: buildMemberProfiles(group, rows, memberByID),
     sampleHoldings: rows.slice(0, 40)
   };
+}
+
+function buildMemberProfiles(group, rows, memberByID) {
+  return (group.members ?? []).map((member) => {
+    const memberRows = rows.filter((row) => row.ownerID === member.id);
+    const valued = memberRows.filter((row) => Number.isFinite(row.marketValueUSD));
+    const totalValue = valued.reduce((sum, row) => sum + row.marketValueUSD, 0);
+    const totalCost = valued.reduce((sum, row) => sum + (Number.isFinite(row.costBasisUSD) ? row.costBasisUSD : 0), 0);
+    const hasCost = valued.some((row) => Number.isFinite(row.costBasisUSD));
+    const pnlUSD = hasCost ? totalValue - totalCost : null;
+    const positions = valued
+      .slice()
+      .sort((a, b) => b.marketValueUSD - a.marketValueUSD)
+      .slice(0, 6)
+      .map((row) => ({
+        symbol: row.symbol,
+        assetName: row.assetName,
+        market: row.market,
+        weight: totalValue ? roundRatio(row.marketValueUSD / totalValue) : 0,
+        marketValueUSD: round(row.marketValueUSD),
+        pnlPercent:
+          Number.isFinite(row.costBasisUSD) && row.costBasisUSD > 0
+            ? roundRatio((row.marketValueUSD - row.costBasisUSD) / row.costBasisUSD)
+            : null
+      }));
+    const top = positions[0];
+    return {
+      name: member.displayName,
+      holdingCount: memberRows.length,
+      totalMarketValueUSD: round(totalValue),
+      totalPnlUSD: pnlUSD === null ? null : round(pnlUSD),
+      totalPnlPercent: pnlUSD !== null && totalCost > 0 ? roundRatio(pnlUSD / totalCost) : null,
+      topWeight: top ? top.weight : 0,
+      positions
+    };
+  });
 }
 
 function adviceHoldingRow(holding, requesterID, memberByID) {
@@ -123,6 +163,10 @@ function adviceHoldingRow(holding, requesterID, memberByID) {
 
   const canSeeAmount = holding.ownerID === requesterID || holding.visibility !== "symbolOnly";
   const marketValueUSD = canSeeAmount ? marketValueInUSD(holding) : null;
+  const costBasisUSD =
+    canSeeAmount && holding.averageCost !== null && Number.isFinite(Number(holding.averageCost))
+      ? costBasisInUSD(holding)
+      : null;
   return {
     ownerID: holding.ownerID,
     owner: member.displayName,
@@ -134,6 +178,7 @@ function adviceHoldingRow(holding, requesterID, memberByID) {
     lastPrice: canSeeAmount ? Number(holding.lastPrice) : null,
     averageCost: canSeeAmount && holding.averageCost !== null ? Number(holding.averageCost) : null,
     marketValueUSD: Number.isFinite(marketValueUSD) ? round(marketValueUSD) : null,
+    costBasisUSD: Number.isFinite(costBasisUSD) ? round(costBasisUSD) : null,
     visibility: holding.visibility,
     hiddenAmount: !canSeeAmount
   };
@@ -167,6 +212,11 @@ function marketValueInUSD(holding) {
   return Number(holding.quantity) * Number(holding.lastPrice) * rate;
 }
 
+function costBasisInUSD(holding) {
+  const rate = FX_TO_USD[holding.currency] ?? 1;
+  return Number(holding.quantity) * Number(holding.averageCost) * rate;
+}
+
 async function requestModelAdvice(profile) {
   const response = await fetch(OPENAI_RESPONSES_URL, {
     method: "POST",
@@ -186,11 +236,14 @@ async function requestModelAdvice(profile) {
             {
               type: "input_text",
               text: [
-                "你是群组持仓观察助手，只输出符合 schema 的 JSON。",
-                "不要给出买入、卖出、目标价、仓位指令或个股荐股。",
-                "从集中度、共识标的、市场分布、成员更新和可见性限制角度生成简短观察。",
-                "如果金额被隐藏，只能说明数据可见性有限，不要推测隐藏金额。",
-                "语气克制、中文、适合手机弹窗阅读。"
+                "你是群组持仓健康度顾问，只输出符合 schema 的 JSON，全部使用中文。",
+                "headline 一句话概括整组的整体状态；summary 用2-3句概述全组的集中度、共识与风险。",
+                "members 数组必须为输入 memberProfiles 中的每一位成员各生成一项，name 与输入完全一致。",
+                "每位成员：healthLabel 用简短中文标签（如“稳健”“偏激进”“高集中”“分散均衡”“数据不足”）；healthScore 为 0-100 的整数健康分（越高越健康，集中度过高/单一市场/大幅浮亏应扣分）。",
+                "health 字段：结合该成员的持仓集中度、市场分布、盈亏(pnlPercent/totalPnlPercent)用1-2句评估其持仓健康程度。",
+                "strategy 字段：结合当前股价表现与盈亏，给出该成员下一步可考虑的调整方向(如分散集中仓位、关注浮亏标的、再平衡市场暴露等)，1-2句，措辞为“可考虑/建议关注”，不要给出明确买卖点位或荐股。",
+                "如果某成员金额被隐藏或无持仓，healthLabel 用“数据不足”，并说明可见数据有限。",
+                "语气克制、专业、适合手机阅读。"
               ].join("\n")
             }
           ]
@@ -231,48 +284,71 @@ async function requestModelAdvice(profile) {
 
 function fallbackAdvice(profile) {
   const topPosition = profile.topPositions[0];
-  const topConsensus = profile.consensus[0];
-  const topMarket = profile.marketDistribution[0];
   const hiddenCopy = profile.hiddenAmountCount ? `另有 ${profile.hiddenAmountCount} 条持仓隐藏了金额，统计口径只覆盖当前可见部分。` : "";
 
   return {
-    headline: topPosition ? "今日组合结构观察" : "等待更多持仓数据",
+    headline: topPosition ? "组合健康度速览" : "等待更多持仓数据",
     summary: topPosition
       ? `当前可见持仓约 ${formatUSD(profile.totalVisibleMarketValue)}，最大可见标的是 ${topPosition.symbol}，占可见市值 ${formatPercent(topPosition.weight)}。${hiddenCopy}`
       : `当前群组还没有足够的可见持仓数据。${hiddenCopy}`,
-    highlights: [
-      topConsensus ? `${topConsensus.symbol} 有 ${topConsensus.holderCount} 位成员同时持有，是当前最明显的共识标的。` : "持有人数达到 2 人以上的共识标的还不多。",
-      topMarket ? `${marketLabel(topMarket.market)}占可见市值 ${formatPercent(topMarket.weight)}，是当前主要市场暴露。` : "市场分布暂时无法判断。",
-      `${profile.group.memberCount} 位成员中已有 ${profile.memberDistribution.filter((item) => item.holdingCount > 0).length} 位提交了可见持仓。`
-    ],
-    risks: [
-      topPosition && topPosition.weight >= 0.3 ? `${topPosition.symbol} 占比偏高，复盘时可以重点关注单一标的集中度。` : "当前最大单一标的占比未触发高集中度提示。",
-      profile.marketDistribution.length <= 1 ? "当前市场暴露较单一，跨市场分散度有限。" : "市场分布已有多元化迹象，但仍需结合成员真实风险偏好判断。",
-      profile.hiddenAmountCount ? "部分成员隐藏金额会影响总览、集中度和共识强度的准确性。" : "本次观察基于当前可见数据。"
-    ],
-    questions: [
-      "本组最想跟踪的是共识增强，还是分歧变化？",
-      "Top3 标的占比变化是否需要作为每次提交后的复盘重点？",
-      "是否要约定每周固定时间统一更新持仓，减少数据滞后？"
-    ]
+    members: (profile.memberProfiles ?? []).map((member) => fallbackMemberAdvice(member))
+  };
+}
+
+function fallbackMemberAdvice(member) {
+  if (!member.holdingCount) {
+    return {
+      name: member.name,
+      healthLabel: "数据不足",
+      healthScore: 0,
+      health: "还没有提交可见持仓，暂时无法评估健康程度。",
+      strategy: "可考虑先提交一次持仓快照，便于后续跟踪与复盘。"
+    };
+  }
+
+  const top = member.positions[0];
+  const concentrated = member.topWeight >= 0.4;
+  const pnl = member.totalPnlPercent;
+  const healthScore = Math.max(
+    10,
+    Math.min(95, Math.round(72 - (concentrated ? 22 : 0) + (pnl ? Math.max(-20, Math.min(15, pnl * 100)) : 0)))
+  );
+  const healthLabel = concentrated ? "偏集中" : member.positions.length >= 4 ? "分散均衡" : "稳健";
+  const pnlCopy = pnl === null ? "盈亏数据未公开" : pnl >= 0 ? `整体浮盈约 ${formatPercent(pnl)}` : `整体浮亏约 ${formatPercent(Math.abs(pnl))}`;
+
+  return {
+    name: member.name,
+    healthLabel,
+    healthScore,
+    health: `共 ${member.holdingCount} 个可见标的，最大单一仓位${top ? `（${top.symbol}）` : ""}约占 ${formatPercent(member.topWeight)}，${pnlCopy}。`,
+    strategy: concentrated
+      ? "单一标的占比偏高，可考虑分散集中仓位、关注与之相关的市场风险。"
+      : "结构相对均衡，可结合各标的盈亏与股价表现做定期再平衡。"
   };
 }
 
 function normalizeAdvice(advice, fallback) {
+  const members = Array.isArray(advice.members)
+    ? advice.members
+        .map((member) => ({
+          name: cleanText(member.name).slice(0, 40),
+          healthLabel: cleanText(member.healthLabel).slice(0, 12) || "观察中",
+          healthScore: clampScore(member.healthScore),
+          health: cleanText(member.health).slice(0, 200),
+          strategy: cleanText(member.strategy).slice(0, 200)
+        }))
+        .filter((member) => member.name)
+    : [];
   return {
     headline: cleanText(advice.headline).slice(0, 48) || fallback.headline,
     summary: cleanText(advice.summary).slice(0, 260) || fallback.summary,
-    highlights: cleanTextList(advice.highlights, fallback.highlights),
-    risks: cleanTextList(advice.risks, fallback.risks),
-    questions: cleanTextList(advice.questions, fallback.questions)
+    members: members.length ? members : fallback.members
   };
 }
 
-function cleanTextList(items, fallback) {
-  const cleaned = Array.isArray(items)
-    ? items.map((item) => cleanText(item).slice(0, 120)).filter(Boolean).slice(0, 3)
-    : [];
-  return cleaned.length ? cleaned : fallback.slice(0, 3);
+function clampScore(value) {
+  const num = Math.round(Number(value) || 0);
+  return Math.max(0, Math.min(100, num));
 }
 
 function cleanText(value) {

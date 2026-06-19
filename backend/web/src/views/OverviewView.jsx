@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 import { useStore } from '../store/StoreContext.jsx'
 import { Avatar } from '../components/Avatar.jsx'
 import Icon from '../components/Icon.jsx'
-import { AllocationStrip, CompactProgress, LegendChips } from '../components/Visuals.jsx'
+import { AllocationStrip, LegendChips } from '../components/Visuals.jsx'
 import AnimatedNumber from '../components/AnimatedNumber.jsx'
 import { money, formatPercent, formatDateTime, signedPercentPoint } from '../utils/format.js'
 import { visibleSummary, exposureRows, groupMarketRows, labelForMarket } from '../utils/finance.js'
@@ -89,9 +89,9 @@ export default function OverviewView({ group }) {
             label="集中度 Top3"
             detail={top3.map((e) => e.symbol).join(' · ') || '暂无'}
             value={formatPercent(top3Weight)}
-            segments={exposures.slice(0, 6).map((e) => ({ symbol: e.symbol, weight: totalVisible > 0 ? e.marketValue / totalVisible : 0 }))}
+            progress={top3Weight}
           />
-          <SignalRow label="活跃度" detail={`近 24h ${activeMembers.size}/${members.length} 位提交`} value={`${activeMembers.size}/${members.length}`} progress={activity} />
+          <SignalRow label="活跃度" detail={`近 24h ${activeMembers.size}/${members.length} 位提交`} value={formatPercent(activity)} progress={activity} />
         </div>
 
         <div className="overview-market-row">
@@ -113,10 +113,7 @@ export default function OverviewView({ group }) {
       {/* 共识标的 */}
       <section className="section">
         <div className="section-header">
-          <div className="section-header-copy">
-            <h2>共识标的</h2>
-            <p className="subtle">只展示 2 位及以上成员同时持有的标的</p>
-          </div>
+          <h2>共识标的</h2>
           <span className="pill">{consensus.length}</span>
         </div>
         <div className="list">
@@ -204,10 +201,7 @@ export default function OverviewView({ group }) {
       {/* 最近变更 */}
       <section className="section">
         <div className="section-header">
-          <div className="section-header-copy">
-            <h2>最近变更</h2>
-            <p className="subtle">按每次提交展示仓位占比变化</p>
-          </div>
+          <h2>最近变更</h2>
         </div>
         <div className="list snapshot-feed-list">
           {snapshots.length === 0 ? (
@@ -317,16 +311,24 @@ function SnapshotChangeRow({ change }) {
   )
 }
 
-function SignalRow({ label, detail, value, progress, segments }) {
+function SignalRow({ label, detail, value, progress = 0 }) {
+  const pct = Math.max(0, Math.min(100, progress * 100))
   return (
     <div className="overview-signal-row">
-      <div className="min-w-0">
-        <div className="overview-signal-label">{label}</div>
-        <div className="overview-signal-detail">{detail}</div>
-      </div>
-      <div className="overview-signal-visual">
+      <div className="overview-signal-top">
+        <div className="min-w-0">
+          <div className="overview-signal-label">{label}</div>
+          <div className="overview-signal-detail">{detail}</div>
+        </div>
         <strong className="overview-signal-value">{value}</strong>
-        {segments ? <AllocationStrip slices={segments} className="overview-signal-strip" /> : <CompactProgress value={progress} />}
+      </div>
+      <div className="overview-signal-track">
+        <motion.div
+          className="overview-signal-fill"
+          initial={{ width: 0 }}
+          animate={{ width: `${pct}%` }}
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        />
       </div>
     </div>
   )

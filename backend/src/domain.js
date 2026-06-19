@@ -153,6 +153,7 @@ export function memberFromUser(user, role = "member", existingMember = undefined
     id: user.id,
     displayName: user.displayName,
     avatarSymbol: user.avatarSymbol,
+    bio: user.bio ?? existingMember?.bio ?? "",
     pictureURL: user.pictureURL ?? existingMember?.pictureURL ?? "",
     role: existingMember?.role ?? role,
     joinedAt: existingMember?.joinedAt ?? new Date().toISOString()
@@ -332,6 +333,7 @@ function normalizeUser(input, existingUser = undefined) {
     displayName: input.displayName,
     email: input.email,
     avatarSymbol: input.avatarSymbol,
+    bio: input.bio ?? existingUser?.bio ?? "",
     pictureURL: input.pictureURL ?? existingUser?.pictureURL ?? "",
     createdAt: existingUser?.createdAt ?? now,
     lastSignedInAt: now

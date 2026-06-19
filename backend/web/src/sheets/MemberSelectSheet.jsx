@@ -25,23 +25,26 @@ export default function MemberSelectSheet() {
               className={`member-select-option ${active ? 'active' : ''}`}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.04 }}
+              transition={{ delay: i * 0.04, type: 'spring', stiffness: 340, damping: 30 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => actions.patch({ selectedMemberID: member.id, sheet: '' })}
             >
-              <span className="member-overview-name">
-                <Avatar member={member} />
-                <span className="min-w-0">
-                  <strong>{member.displayName}</strong>
-                  <span className="subtle">
+              <Avatar member={member} />
+              <span className="member-select-info min-w-0">
+                <strong className="member-select-name">{member.displayName}</strong>
+                {member.bio ? (
+                  <span className="member-select-bio">{member.bio}</span>
+                ) : (
+                  <span className="member-select-sub">
                     {insights.totalCount} 项 · {insights.latestSnapshotAt ? formatDateTime(insights.latestSnapshotAt) : '未提交'}
                   </span>
-                </span>
+                )}
               </span>
               <span className="member-select-metrics">
                 <strong>{money(insights.totalVisibleValue)}</strong>
                 <span>前三 {formatPercent(insights.top3Weight)}</span>
               </span>
+              {active && <span className="member-select-check" aria-hidden="true" />}
             </motion.button>
           )
         })}
