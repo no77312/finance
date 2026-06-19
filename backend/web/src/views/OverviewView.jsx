@@ -1,15 +1,17 @@
 import { motion } from 'framer-motion'
 import { useStore } from '../store/StoreContext.jsx'
 import { Avatar } from '../components/Avatar.jsx'
+import Icon from '../components/Icon.jsx'
 import { AllocationStrip, CompactProgress, LegendChips } from '../components/Visuals.jsx'
 import AnimatedNumber from '../components/AnimatedNumber.jsx'
-import { money, formatPercent, formatDateTime } from '../utils/format.js'
+import { money, formatPercent, formatDateTime, signedPercentPoint } from '../utils/format.js'
 import { visibleSummary, exposureRows, groupMarketRows, labelForMarket } from '../utils/finance.js'
 import {
   groupHoldings,
   groupLatestSnapshotAt,
   membersWithRecentSnapshots,
   buildPortfolioInsights,
+  recentSnapshotSummaries,
 } from '../utils/insights.js'
 
 const fadeUp = {
@@ -30,6 +32,7 @@ export default function OverviewView({ group }) {
   const marketRows = groupMarketRows(holdings, memberID)
   const contributingIDs = new Set(holdings.map((h) => h.ownerID))
   const latestAt = groupLatestSnapshotAt(data, group.id)
+  const snapshots = recentSnapshotSummaries(data, group.id, members, memberID).slice(0, 6)
 
   // 信号行
   const totalVisible = summary.marketValue
@@ -130,12 +133,15 @@ export default function OverviewView({ group }) {
                 whileHover={{ y: -2 }}
               >
                 <div className="consensus-compact-head">
-                  <strong className="holding-title">{e.assetName || e.symbol}</strong>
-                  <div className="holding-meta">
-                    <span>{e.symbol}</span>
+                  <div className="member-overview-line">
+                    <span className="member-overview-name">
+                      <span>{e.assetName || e.symbol}</span>
+                    </span>
+                    <strong className="member-overview-value">{money(e.marketValue)}</strong>
+                  </div>
+                  <div className="member-overview-subline">
+                    <span>{e.symbol} · {e.currency}</span>
                     <span>{e.holderCount} 人持有</span>
-                    <span>{e.currency}</span>
-                    <span>{money(e.marketValue)}</span>
                   </div>
                 </div>
                 <div className="consensus-weight-list">
@@ -194,7 +200,120 @@ export default function OverviewView({ group }) {
           })}
         </div>
       </section>
+
+      {/* 最近变更 */}
+      <section className="section">
+        <div className="section-header">
+          <div>
+            <h2>最近变更</h2>
+            <p className="subtle">按每次提交展示仓位占比变化</p>
+          </div>
+        </div>
+        <div className="list snapshot-feed-list">
+          {snapshots.length === 0 ? (
+            <div className="empty">还没有成员提交持仓。</div>
+          ) : (
+            snapshots.map((s, i) => (
+              <motion.article
+                key={s.snapshot.id}
+                className="list-item snapshot-card snapshot-feed-card"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.04, type: 'spring', stiffness: 300, damping: 28 }}
+              >
+                <div className="snapshot-card-head snapshot-feed-head">
+                  <div className="account account-compact">
+                    <Avatar member={s.owner} />
+                    <div className="min-w-0">
+                      <div className="account-name">{s.owner?.displayName || '成员'}</div>
+                      <div className="member-meta">
+                        {s.previousSnapshot ? '组合调仓' : '首次提交组合'} · {formatDateTime(s.snapshot.createdAt)}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="snapshot-meta">
+                    <span className={`pill ${s.sourceTone}`}>{s.sourceLabel}</span>
+                  </div>
+                </div>
+                {s.primaryChange && <SnapshotHighlight change={s.primaryChange} />}
+                <div className="weight-summary">
+                  {s.summaryChips.length ? (
+                    s.summaryChips.map((chip, ci) => (
+                      <span key={ci} className={`weight-chip ${chip.tone}`}>{chip.label}</span>
+                    ))
+                  ) : (
+                    <span className="weight-chip">仓位占比无变化</span>
+                  )}
+                </div>
+                <div className="snapshot-change-list compact-change-list">
+                  {s.rows.length ? (
+                    s.rows.slice(0, 4).map((change) => (
+                      <SnapshotChangeRow key={change.symbol} change={change} />
+                    ))
+                  ) : (
+                    <div className="snapshot-empty">本次提交没有产生新的仓位占比变化。</div>
+                  )}
+                </div>
+                {s.note && (
+                  <div className="holding-change">
+                    <span>{s.note}</span>
+                  </div>
+                )}
+              </motion.article>
+            ))
+          )}
+        </div>
+      </section>
     </main>
+  )
+}
+
+const CHANGE_ICONS = { new: 'plus', up: 'arrow-up', down: 'arrow-down', removed: 'minus' }
+
+function changeToneClass(status) {
+  if (status === 'up' || status === 'new') return 'positive'
+  if (status === 'down' || status === 'removed') return 'negative'
+  return ''
+}
+
+function ChangeIcon({ change }) {
+  return (
+    <span className={`snapshot-change-icon ${changeToneClass(change.status)}`} aria-hidden="true">
+      <Icon name={CHANGE_ICONS[change.status] ?? 'adjust'} size={14} />
+    </span>
+  )
+}
+
+function SnapshotHighlight({ change }) {
+  return (
+    <div className={`snapshot-highlight ${changeToneClass(change.status)}`}>
+      <ChangeIcon change={change} />
+      <div className="min-w-0">
+        <div className="snapshot-highlight-label">主要变化</div>
+        <div className="snapshot-highlight-title">{change.assetName || change.symbol}</div>
+        <div className="snapshot-highlight-meta">{change.symbol} · {change.statusLabel}</div>
+      </div>
+      <div className="snapshot-highlight-value">
+        <strong>{formatPercent(change.beforeWeight)} → {formatPercent(change.afterWeight)}</strong>
+        <span>{signedPercentPoint(change.delta)}</span>
+      </div>
+    </div>
+  )
+}
+
+function SnapshotChangeRow({ change }) {
+  return (
+    <div className="snapshot-change-row">
+      <ChangeIcon change={change} />
+      <div className="snapshot-change-symbol min-w-0">
+        <strong>{change.assetName || change.symbol}</strong>
+        <span>{change.symbol} · {change.statusLabel}</span>
+      </div>
+      <div className={`snapshot-change-values ${changeToneClass(change.status)}`}>
+        <strong>{formatPercent(change.beforeWeight)} → {formatPercent(change.afterWeight)}</strong>
+        <span>{signedPercentPoint(change.delta)}</span>
+      </div>
+    </div>
   )
 }
 

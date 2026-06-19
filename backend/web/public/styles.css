@@ -1759,6 +1759,13 @@ button.list-item.active {
   height: 36px;
 }
 
+.account-compact .mini-avatar {
+  width: 36px;
+  height: 36px;
+  margin-left: 0;
+  border-width: 1px;
+}
+
 .account-compact .account-name {
   font-size: 15px;
 }
