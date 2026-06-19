@@ -14,6 +14,7 @@
   --accent-soft: #eef7ff;
   --accent-card-mid: #3a9dff;
   --accent-card-end: #72c6ff;
+  --accent-gradient: linear-gradient(135deg, var(--accent) 0%, var(--accent-card-mid) 55%, var(--accent-card-end) 100%);
   --green: #34c759;
   --green-soft: #eefaf2;
   --red: #ff3b30;
@@ -317,7 +318,8 @@ button {
 }
 
 .primary-button {
-  background: var(--accent);
+  background: var(--accent-gradient);
+  background-size: 140% 140%;
   color: #ffffff;
   box-shadow: 0 8px 24px rgba(var(--accent-rgb), 0.22);
 }
@@ -338,6 +340,11 @@ button:active {
 .icon-button:hover,
 .danger-button:hover {
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.primary-button:hover {
+  background-position: 60% 40%;
+  box-shadow: 0 10px 24px rgba(var(--accent-rgb), 0.24);
 }
 
 button:disabled {
@@ -1101,7 +1108,7 @@ button.list-item.active {
 .compact-progress-fill {
   height: 100%;
   border-radius: inherit;
-  background: var(--accent);
+  background: var(--accent-gradient);
   transition: width 360ms var(--ease-standard);
 }
 
@@ -1679,7 +1686,7 @@ button.list-item.active {
 }
 
 .group-menu-status.active {
-  background: var(--accent);
+  background: var(--accent-gradient);
   color: #ffffff;
 }
 
@@ -1785,7 +1792,7 @@ button.list-item.active {
   bottom: 6px;
   width: calc((100% - 12px) / 3);
   border-radius: 22px;
-  background: var(--accent);
+  background: var(--accent-gradient);
   box-shadow: 0 6px 16px rgba(var(--accent-rgb), 0.32);
   z-index: 0;
 }
@@ -1971,7 +1978,7 @@ button.list-item.active {
   height: 10px;
   margin-top: 6px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--accent-gradient);
 }
 
 .timeline-body {
@@ -2367,7 +2374,7 @@ button.list-item.active {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--accent-gradient);
   animation: import-pulse 1.4s ease-in-out infinite;
 }
 
