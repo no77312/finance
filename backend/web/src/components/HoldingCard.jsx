@@ -11,7 +11,7 @@ import {
 } from '../utils/finance.js'
 
 // 单个持仓卡片，支持 hover/tap 微交互、layout 动画
-export default function HoldingCard({ holding, currentMemberID, weight, editable, onEdit, onDelete }) {
+export default function HoldingCard({ holding, currentMemberID, weight, toneIndex = 0, editable, onEdit, onDelete }) {
   const seeValues = canSeeValues(holding, currentMemberID)
   const seeCost = canSeeCost(holding, currentMemberID)
   const mv = holdingMarketValueUSD(holding)
@@ -62,7 +62,7 @@ export default function HoldingCard({ holding, currentMemberID, weight, editable
       {typeof weight === 'number' && seeValues && (
         <div className="weight-summary">
           <span className="weight-chip strong">{formatPercent(weight)} · 组合占比</span>
-          <WeightBar value={weight} />
+          <WeightBar value={weight} tone={toneIndex} />
         </div>
       )}
 

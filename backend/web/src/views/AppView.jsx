@@ -15,8 +15,8 @@ const TABS = [
 ]
 const TAB_INDEX = { overview: 0, members: 1, mine: 2 }
 
-const SPRING = { type: 'spring', stiffness: 420, damping: 36, mass: 0.7 }
-const PAGE_FADE = { duration: 0.18, ease: [0.33, 0, 0.2, 1] }
+const SPRING = { type: 'spring', stiffness: 430, damping: 38, mass: 0.72 }
+const PAGE_TRANSITION = { duration: 0.24, ease: [0.16, 1, 0.3, 1] }
 
 export default function AppView() {
   const { state } = useStore()
@@ -32,10 +32,10 @@ export default function AppView() {
             <motion.div
               key={state.activeTab}
               className="page-slide"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={PAGE_FADE}
+              initial={{ opacity: 0, y: 8, scale: 0.996 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -5, scale: 0.998 }}
+              transition={PAGE_TRANSITION}
             >
               {state.activeTab === 'members' ? (
                 <MembersView group={group} />
@@ -68,6 +68,7 @@ function Topbar({ group }) {
           {group && (
             <motion.button
               className="topbar-pill-button"
+              whileHover={{ y: -1 }}
               whileTap={{ scale: 0.92 }}
               onClick={() => {
                 actions.patch({ sheet: 'ai-advice' })
@@ -80,6 +81,7 @@ function Topbar({ group }) {
           )}
           <motion.button
             className="topbar-pill-button"
+            whileHover={{ y: -1 }}
             whileTap={{ scale: 0.92 }}
             onClick={() => actions.patch({ sheet: 'groups' })}
             aria-label="群组"
@@ -111,10 +113,11 @@ function Tabbar() {
             className={`tabbar-item ${active ? 'active' : ''}`}
             onClick={() => actions.patch({ activeTab: tab.value, sheet: '' })}
             aria-label={tab.label}
+            aria-current={active ? 'page' : undefined}
           >
             <motion.span
               className="tabbar-icon"
-              animate={{ scale: active ? 1.08 : 1 }}
+              animate={{ scale: active ? 1.06 : 1, y: active ? -1 : 0 }}
               transition={SPRING}
             >
               <Icon name={tab.icon} size={24} />

@@ -4,7 +4,7 @@ import { Avatar } from '../components/Avatar.jsx'
 import Icon from '../components/Icon.jsx'
 import { AllocationStrip, LegendChips } from '../components/Visuals.jsx'
 import AnimatedNumber from '../components/AnimatedNumber.jsx'
-import { money, formatPercent, formatDateTime, signedPercentPoint } from '../utils/format.js'
+import { money, formatNumber, formatPercent, formatDateTime, signedPercentPoint } from '../utils/format.js'
 import { visibleSummary, exposureRows, groupMarketRows, labelForMarket } from '../utils/finance.js'
 import {
   groupHoldings,
@@ -15,8 +15,8 @@ import {
 } from '../utils/insights.js'
 
 const fadeUp = {
-  initial: { opacity: 0 },
-  animate: { opacity: 1 },
+  initial: { opacity: 0, y: 8 },
+  animate: { opacity: 1, y: 0 },
 }
 
 export default function OverviewView({ group }) {
@@ -236,7 +236,7 @@ export default function OverviewView({ group }) {
                       <span key={ci} className={`weight-chip ${chip.tone}`}>{chip.label}</span>
                     ))
                   ) : (
-                    <span className="weight-chip">仓位占比无变化</span>
+                    <span className="weight-chip">持股数量无变化</span>
                   )}
                 </div>
                 <div className="snapshot-change-list compact-change-list">
@@ -245,7 +245,7 @@ export default function OverviewView({ group }) {
                       <SnapshotChangeRow key={change.symbol} change={change} />
                     ))
                   ) : (
-                    <div className="snapshot-empty">本次提交没有产生新的仓位占比变化。</div>
+                    <div className="snapshot-empty">本次提交没有产生持股数量或仓位占比变化。</div>
                   )}
                 </div>
                 {s.note && (
@@ -262,7 +262,7 @@ export default function OverviewView({ group }) {
   )
 }
 
-const CHANGE_ICONS = { new: 'plus', up: 'arrow-up', down: 'arrow-down', removed: 'minus' }
+const CHANGE_ICONS = { new: 'plus', up: 'arrow-up', down: 'arrow-down', removed: 'minus', weight: 'adjust' }
 
 function changeToneClass(status) {
   if (status === 'up' || status === 'new') return 'positive'
@@ -279,13 +279,16 @@ function ChangeIcon({ change }) {
 }
 
 function SnapshotHighlight({ change }) {
+  const quantityText = quantityChangeText(change)
   return (
     <div className={`snapshot-highlight ${changeToneClass(change.status)}`}>
       <ChangeIcon change={change} />
       <div className="min-w-0">
         <div className="snapshot-highlight-label">主要变化</div>
         <div className="snapshot-highlight-title">{change.assetName || change.symbol}</div>
-        <div className="snapshot-highlight-meta">{change.symbol} · {change.statusLabel}</div>
+        <div className="snapshot-highlight-meta">
+          {change.symbol} · {change.statusLabel}{quantityText ? ` · ${quantityText}` : ''}
+        </div>
       </div>
       <div className="snapshot-highlight-value">
         <strong>{formatPercent(change.beforeWeight)} → {formatPercent(change.afterWeight)}</strong>
@@ -296,12 +299,13 @@ function SnapshotHighlight({ change }) {
 }
 
 function SnapshotChangeRow({ change }) {
+  const quantityText = quantityChangeText(change)
   return (
     <div className="snapshot-change-row">
       <ChangeIcon change={change} />
       <div className="snapshot-change-symbol min-w-0">
         <strong>{change.assetName || change.symbol}</strong>
-        <span>{change.symbol} · {change.statusLabel}</span>
+        <span>{change.symbol} · {change.statusLabel}{quantityText ? ` · ${quantityText}` : ''}</span>
       </div>
       <div className={`snapshot-change-values ${changeToneClass(change.status)}`}>
         <strong>{formatPercent(change.beforeWeight)} → {formatPercent(change.afterWeight)}</strong>
@@ -309,6 +313,16 @@ function SnapshotChangeRow({ change }) {
       </div>
     </div>
   )
+}
+
+function quantityChangeText(change) {
+  if (change.status === 'weight') return ''
+  const before = Number(change.beforeQuantity)
+  const after = Number(change.afterQuantity)
+  if (!Number.isFinite(before) || !Number.isFinite(after)) return ''
+  if (change.status === 'new') return `数量 ${formatNumber(after)}`
+  if (change.status === 'removed') return `原 ${formatNumber(before)}`
+  return `${formatNumber(before)} → ${formatNumber(after)}`
 }
 
 function SignalRow({ label, detail, value, progress = 0 }) {

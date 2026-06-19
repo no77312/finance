@@ -34,12 +34,12 @@ export function CompactProgress({ value = 0 }) {
 }
 
 // 权重条
-export function WeightBar({ value = 0 }) {
+export function WeightBar({ value = 0, tone = 0 }) {
   const pct = Math.max(0, Math.min(100, value * 100))
   return (
     <div className="weight-bar">
       <motion.div
-        className="weight-fill"
+        className={`weight-fill tone-${tone % 6}`}
         initial={{ width: 0 }}
         animate={{ width: `${pct}%` }}
         transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}

@@ -75,7 +75,7 @@ export default function PortfolioSection({
               还没有持仓
             </motion.div>
           ) : (
-            insights.holdings.map((holding) => {
+            insights.holdings.map((holding, index) => {
               const mv = holdingMarketValueUSD(holding)
               const weight = insights.totalVisibleValue > 0 ? mv / insights.totalVisibleValue : 0
               return (
@@ -84,6 +84,7 @@ export default function PortfolioSection({
                   holding={holding}
                   currentMemberID={currentMemberID}
                   weight={weight}
+                  toneIndex={index}
                   editable={editable}
                   onEdit={onEdit}
                   onDelete={onDelete}
