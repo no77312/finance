@@ -821,8 +821,8 @@ button.list-item.active {
 }
 
 .weight-chip.strong {
-  background: rgba(127, 183, 216, 0.18);
-  color: #3f7899;
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .weight-chip.positive {
@@ -845,32 +845,32 @@ button.list-item.active {
 .weight-fill {
   height: 100%;
   border-radius: 999px;
-  background: #7fb7d8;
+  background: linear-gradient(90deg, #8fd1ff 0%, #5ac8fa 100%);
   transition: width 360ms var(--ease-standard);
 }
 
 .weight-fill.tone-0 {
-  background: #7fb7d8;
+  background: linear-gradient(90deg, #8fd1ff 0%, #5ac8fa 100%);
 }
 
 .weight-fill.tone-1 {
-  background: #8fc7a1;
+  background: linear-gradient(90deg, #a9eec0 0%, #6ee59c 100%);
 }
 
 .weight-fill.tone-2 {
-  background: #d9b77a;
+  background: linear-gradient(90deg, #ffdca2 0%, #ffc15e 100%);
 }
 
 .weight-fill.tone-3 {
-  background: #aaa6d8;
+  background: linear-gradient(90deg, #c8c7ff 0%, #a9a7ff 100%);
 }
 
 .weight-fill.tone-4 {
-  background: #daa1ae;
+  background: linear-gradient(90deg, #ffb3c8 0%, #ff86a8 100%);
 }
 
 .weight-fill.tone-5 {
-  background: #9fcbd7;
+  background: linear-gradient(90deg, #b7efff 0%, #84dcff 100%);
 }
 
 .portfolio-summary {
@@ -1400,27 +1400,27 @@ button.list-item.active {
 }
 
 .allocation-segment.tone-0 {
-  background: #7fb7d8;
+  background: linear-gradient(90deg, #8fd1ff 0%, #5ac8fa 100%);
 }
 
 .allocation-segment.tone-1 {
-  background: #8fc7a1;
+  background: linear-gradient(90deg, #a9eec0 0%, #6ee59c 100%);
 }
 
 .allocation-segment.tone-2 {
-  background: #d9b77a;
+  background: linear-gradient(90deg, #ffdca2 0%, #ffc15e 100%);
 }
 
 .allocation-segment.tone-3 {
-  background: #aaa6d8;
+  background: linear-gradient(90deg, #c8c7ff 0%, #a9a7ff 100%);
 }
 
 .allocation-segment.tone-4 {
-  background: #daa1ae;
+  background: linear-gradient(90deg, #ffb3c8 0%, #ff86a8 100%);
 }
 
 .allocation-segment.tone-5 {
-  background: #9fcbd7;
+  background: linear-gradient(90deg, #b7efff 0%, #84dcff 100%);
 }
 
 .legend-chip strong {
@@ -1429,33 +1429,33 @@ button.list-item.active {
 }
 
 .legend-chip.tone-0 {
-  background: rgba(127, 183, 216, 0.18);
-  color: #3f7899;
+  background: rgba(10, 132, 255, 0.12);
+  color: #0060c9;
 }
 
 .legend-chip.tone-1 {
-  background: rgba(143, 199, 161, 0.18);
-  color: #4f8c62;
+  background: rgba(52, 199, 89, 0.12);
+  color: #1d7d3c;
 }
 
 .legend-chip.tone-2 {
-  background: rgba(217, 183, 122, 0.20);
-  color: #946f2f;
+  background: rgba(255, 159, 10, 0.14);
+  color: #b86c00;
 }
 
 .legend-chip.tone-3 {
-  background: rgba(170, 166, 216, 0.20);
-  color: #6863a4;
+  background: rgba(94, 92, 230, 0.12);
+  color: #4340c7;
 }
 
 .legend-chip.tone-4 {
-  background: rgba(218, 161, 174, 0.20);
-  color: #9c5b69;
+  background: rgba(255, 55, 95, 0.12);
+  color: #d92052;
 }
 
 .legend-chip.tone-5 {
-  background: rgba(159, 203, 215, 0.20);
-  color: #4d8391;
+  background: rgba(100, 210, 255, 0.14);
+  color: #0074a6;
 }
 
 .pill {
