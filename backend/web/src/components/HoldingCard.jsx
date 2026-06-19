@@ -10,7 +10,7 @@ import {
   labelForMarket,
 } from '../utils/finance.js'
 
-// 单个持仓卡片，支持 hover/tap 微交互、layout 动画
+// 单个持仓卡片，保留列表布局动画，避免切页时逐卡上浮。
 export default function HoldingCard({ holding, currentMemberID, weight, toneIndex = 0, editable, onEdit, onDelete }) {
   const seeValues = canSeeValues(holding, currentMemberID)
   const seeCost = canSeeCost(holding, currentMemberID)
@@ -21,11 +21,8 @@ export default function HoldingCard({ holding, currentMemberID, weight, toneInde
     <motion.article
       layout="position"
       className="list-item holding-card"
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.96, height: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0 }}
       transition={{ type: 'spring', stiffness: 360, damping: 34, mass: 0.7 }}
-      whileHover={{ y: -2 }}
     >
       <div className="holding-card-head">
         <div className="min-w-0">

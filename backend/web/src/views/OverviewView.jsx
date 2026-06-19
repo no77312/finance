@@ -14,11 +14,6 @@ import {
   recentSnapshotSummaries,
 } from '../utils/insights.js'
 
-const fadeUp = {
-  initial: { opacity: 0, y: 8 },
-  animate: { opacity: 1, y: 0 },
-}
-
 export default function OverviewView({ group }) {
   const { state, actions } = useStore()
   const memberID = state.session.currentMemberID
@@ -53,7 +48,7 @@ export default function OverviewView({ group }) {
   return (
     <main className="content overview-layout">
       {/* 群组仪表盘 */}
-      <motion.section className="panel group-overview-panel" {...fadeUp} transition={{ type: 'spring', stiffness: 240, damping: 26 }}>
+      <section className="panel group-overview-panel">
         <div className="overview-heading compact">
           <div>
             <strong>{group.name}</strong>
@@ -69,17 +64,14 @@ export default function OverviewView({ group }) {
         </div>
 
         <div className="overview-kpi-row">
-          {kpis.map((kpi, i) => (
-            <motion.div
+          {kpis.map((kpi) => (
+            <div
               key={kpi.label}
               className="overview-kpi"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.04, type: 'spring', stiffness: 340, damping: 30 }}
             >
               <span>{kpi.label}</span>
               <strong>{kpi.node ?? kpi.value}</strong>
-            </motion.div>
+            </div>
           ))}
         </div>
 
@@ -108,7 +100,7 @@ export default function OverviewView({ group }) {
             )}
           </div>
         </div>
-      </motion.section>
+      </section>
 
       {/* 共识标的 */}
       <section className="section">
@@ -120,14 +112,10 @@ export default function OverviewView({ group }) {
           {consensus.length === 0 ? (
             <div className="empty">暂无共识标的</div>
           ) : (
-            consensus.slice(0, 8).map((e, i) => (
-              <motion.article
+            consensus.slice(0, 8).map((e) => (
+              <article
                 key={`${e.symbol}|${e.currency}`}
                 className="list-item exposure-card compact-exposure-card"
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.04, type: 'spring', stiffness: 300, damping: 28 }}
-                whileHover={{ y: -2 }}
               >
                 <div className="consensus-compact-head">
                   <div className="member-overview-line">
@@ -153,7 +141,7 @@ export default function OverviewView({ group }) {
                     )
                   })}
                 </div>
-              </motion.article>
+              </article>
             ))
           )}
         </div>
@@ -166,16 +154,12 @@ export default function OverviewView({ group }) {
           <span className="pill">{members.length} 人</span>
         </div>
         <div className="member-overview-grid">
-          {members.map((member, i) => {
+          {members.map((member) => {
             const insights = buildPortfolioInsights(data, group.id, member.id, memberID)
             return (
               <motion.button
                 key={member.id}
                 className="list-item member-overview-card"
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05, type: 'spring', stiffness: 300, damping: 28 }}
-                whileHover={{ y: -3 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => actions.patch({ activeTab: 'members', selectedMemberID: member.id })}
               >
@@ -207,13 +191,10 @@ export default function OverviewView({ group }) {
           {snapshots.length === 0 ? (
             <div className="empty">还没有成员提交持仓。</div>
           ) : (
-            snapshots.map((s, i) => (
-              <motion.article
+            snapshots.map((s) => (
+              <article
                 key={s.snapshot.id}
                 className="list-item snapshot-card snapshot-feed-card"
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.04, type: 'spring', stiffness: 300, damping: 28 }}
               >
                 <div className="snapshot-card-head snapshot-feed-head">
                   <div className="account account-compact">
@@ -253,7 +234,7 @@ export default function OverviewView({ group }) {
                     <span>{s.note}</span>
                   </div>
                 )}
-              </motion.article>
+              </article>
             ))
           )}
         </div>

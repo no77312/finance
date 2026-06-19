@@ -37,9 +37,6 @@ export default function MineView({ group }) {
         <motion.button
           type="button"
           className="panel profile-card profile-card-button"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ type: 'spring', stiffness: 340, damping: 30 }}
           whileTap={{ scale: 0.99 }}
           onClick={() => actions.patch({ sheet: 'profile-edit' })}
         >
@@ -90,13 +87,10 @@ export default function MineView({ group }) {
             {events.length === 0 ? (
               <div className="empty">还没有变动记录</div>
             ) : (
-              events.map((e, i) => (
-                <motion.div
+              events.map((e) => (
+                <div
                   key={e.id}
                   className="timeline-item"
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.03 }}
                 >
                   <span className={`timeline-dot ${e.type}`} />
                   <div className="timeline-body">
@@ -107,7 +101,7 @@ export default function MineView({ group }) {
                       {formatDateTime(e.createdAt)} · 数量 {formatNumber(e.quantity)}
                     </span>
                   </div>
-                </motion.div>
+                </div>
               ))
             )}
           </div>
