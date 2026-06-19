@@ -48,6 +48,49 @@ function Root() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // 登录后保持轻量同步：前台轮询 + 回到前台立即刷新。
+  useEffect(() => {
+    if (!state.session || state.booting) return undefined
+
+    let inFlight = false
+    let lastRefreshAt = 0
+
+    async function refreshSilently() {
+      if (inFlight || document.visibilityState === 'hidden') return
+      inFlight = true
+      lastRefreshAt = Date.now()
+      try {
+        await actions.refreshBootstrap({ resetAdvice: false })
+      } catch {
+        // 静默同步失败不打断用户，下一轮或重新打开时会再试。
+      } finally {
+        inFlight = false
+      }
+    }
+
+    function refreshWhenActive() {
+      if (Date.now() - lastRefreshAt > 5000) {
+        refreshSilently()
+      }
+    }
+
+    function onVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        refreshWhenActive()
+      }
+    }
+
+    const timer = window.setInterval(refreshSilently, 30000)
+    window.addEventListener('focus', refreshWhenActive)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', refreshWhenActive)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [state.session, state.booting, actions])
+
   // 同步 sheet-open class 与 theme-color
   useEffect(() => {
     const open = Boolean(state.sheet || state.confirm)

@@ -118,7 +118,7 @@ export function StoreProvider({ children }) {
     [patch],
   )
 
-  const refreshBootstrap = useCallback(async () => {
+  const refreshBootstrap = useCallback(async ({ resetAdvice = true } = {}) => {
     const data = await callApi('/api/bootstrap')
     const current = stateRef.current
     const normalized = normalizeBootstrap(current, data)
@@ -129,7 +129,7 @@ export function StoreProvider({ children }) {
     patch({
       data: normalized,
       session,
-      adviceByGroupID: {},
+      ...(resetAdvice ? { adviceByGroupID: {} } : {}),
       activeGroupID: stillThere ? current.activeGroupID : groups[0]?.id ?? '',
     })
   }, [callApi, patch])
