@@ -113,7 +113,7 @@ export default function OverviewView({ group }) {
       {/* 共识标的 */}
       <section className="section">
         <div className="section-header">
-          <div>
+          <div className="section-header-copy">
             <h2>共识标的</h2>
             <p className="subtle">只展示 2 位及以上成员同时持有的标的</p>
           </div>
@@ -204,7 +204,7 @@ export default function OverviewView({ group }) {
       {/* 最近变更 */}
       <section className="section">
         <div className="section-header">
-          <div>
+          <div className="section-header-copy">
             <h2>最近变更</h2>
             <p className="subtle">按每次提交展示仓位占比变化</p>
           </div>
