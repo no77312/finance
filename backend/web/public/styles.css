@@ -1729,37 +1729,45 @@ button.list-item.active {
   z-index: 30;
   display: grid;
   align-items: end;
-  background: rgba(245, 246, 248, 0.92);
-  padding: calc(12px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom));
+  background: rgba(245, 246, 248, 0.72);
+  padding: calc(52px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom));
   animation: fade-in 180ms var(--ease-standard);
 }
 
 .sheet-panel {
   width: min(100%, 560px);
-  max-height: min(88vh, 820px);
+  max-height: min(82dvh, 760px);
   margin: 0 auto;
   overflow: auto;
   background: #ffffff;
   border: 1px solid rgba(60, 60, 67, 0.12);
   border-radius: 30px;
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.14);
-  padding: 16px;
+  padding: 12px 16px 16px;
   display: grid;
   gap: 14px;
   animation: sheet-in 320ms var(--ease-spring);
   will-change: transform, opacity;
 }
 
+.sheet-grabber {
+  justify-self: center;
+  width: 42px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(60, 60, 67, 0.18);
+}
+
 .sheet-header {
   position: sticky;
-  top: -16px;
+  top: -12px;
   z-index: 5;
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 10px;
   align-items: center;
-  margin: -16px -16px 0;
-  padding: 16px 16px 12px;
+  margin: -12px -16px 0;
+  padding: 14px 16px 12px;
   border-radius: 30px 30px 0 0;
   background: #ffffff;
   border-bottom: 1px solid rgba(229, 229, 234, 0.72);

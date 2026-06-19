@@ -21,6 +21,7 @@ export default function Sheet({ children, onClose, compact }) {
         exit={{ y: 24, scale: 0.99, opacity: 0 }}
         transition={{ type: 'spring', stiffness: 380, damping: 34, mass: 0.86 }}
       >
+        <span className="sheet-grabber" aria-hidden="true" />
         {children}
       </motion.section>
     </motion.div>
