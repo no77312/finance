@@ -2372,10 +2372,6 @@ button.list-item.active {
     font-size: 20px;
   }
 
-  .overview-signal-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
   .overview-market-row {
     display: grid;
     gap: 8px;

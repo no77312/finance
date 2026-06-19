@@ -81,7 +81,7 @@ export default function OverviewView({ group }) {
               slices={marketSlices}
               size={120}
               thickness={16}
-              centerValue={formatPercent(submittedRatio)}
+              centerValue={`${Math.round(submittedRatio * 100)}%`}
               centerLabel="已提交"
             />
           </div>
