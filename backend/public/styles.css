@@ -569,7 +569,7 @@ button.list-item.active {
 }
 
 .holding-card-price {
-  min-width: 88px;
+  min-width: 78px;
   display: grid;
   justify-items: end;
   gap: 2px;
@@ -577,7 +577,7 @@ button.list-item.active {
 }
 
 .holding-card-price strong {
-  font-size: 17px;
+  font-size: 16px;
   line-height: 1.05;
   font-weight: 820;
   white-space: nowrap;
@@ -602,9 +602,9 @@ button.list-item.active {
 }
 
 .privacy-pill {
-  min-height: 20px;
-  padding: 2px 8px;
-  font-size: 11px;
+  min-height: 18px;
+  padding: 1px 6px;
+  font-size: 10px;
   font-weight: 650;
   line-height: 1;
 }

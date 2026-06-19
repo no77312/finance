@@ -1220,7 +1220,6 @@ function draftWarningsHTML() {
 }
 
 function holdingHTML(holding, options = {}) {
-  const owner = memberForHolding(holding);
   const showValues = canSeeValues(holding);
   const showCost = canSeeCost(holding);
   const marketValue = holdingMarketValueUSD(holding);
@@ -1241,7 +1240,6 @@ function holdingHTML(holding, options = {}) {
           <div class="holding-meta">
             <span>${escapeHTML(holding.symbol)}</span>
             <span>${escapeHTML(labelForMarket(holding.market))}</span>
-            <span>${escapeHTML(owner?.displayName || "")}</span>
             ${sourceCurrencyHTML(holding.currency)}
             ${privacyPillHTML(holding)}
           </div>
