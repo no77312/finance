@@ -98,14 +98,15 @@ export default function GroupsSheet() {
                   className="group-menu-select"
                   onClick={() => actions.patch({ activeGroupID: group.id, selectedMemberID: '', sheet: '' })}
                 >
-                  <span>
-                    <strong>{group.name}</strong>
-                    <span className="subtle">
-                      {(group.members?.length ?? 0)} 人 · {group.inviteCode}
+                  <span className="group-menu-copy">
+                    <span className="group-name-bubble">{group.name}</span>
+                    <span className="group-menu-item-meta">
+                      <span>{(group.members?.length ?? 0)} 人</span>
+                      <span>{group.inviteCode}</span>
                     </span>
                   </span>
-                  <span className={`pill ${group.id === state.activeGroupID ? 'blue' : ''}`}>
-                    {group.id === state.activeGroupID ? '当前群组' : '切换'}
+                  <span className={`group-menu-status ${group.id === state.activeGroupID ? 'active' : ''}`}>
+                    {group.id === state.activeGroupID ? '当前' : '切换'}
                   </span>
                 </button>
                 <button className="icon-button group-menu-action" onClick={() => actions.patch({ sheet: 'group-manage', manageGroupID: group.id })}>
