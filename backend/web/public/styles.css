@@ -367,13 +367,13 @@ button:disabled {
 
 .content {
   display: grid;
-  gap: 20px;
-  margin-top: 20px;
+  gap: 14px;
+  margin-top: 14px;
 }
 
 .section {
   display: grid;
-  gap: 14px;
+  gap: 11px;
 }
 
 .section-header {
@@ -390,7 +390,7 @@ button:disabled {
 
 .section-title {
   margin: 0;
-  font-size: 20px;
+  font-size: 18px;
   line-height: 1.25;
   font-weight: 700;
 }
@@ -440,20 +440,20 @@ button:disabled {
 
 .panel,
 .form-panel {
-  padding: 18px;
+  padding: 14px;
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .list {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .list-item {
-  padding: 16px;
+  padding: 13px;
   display: grid;
-  gap: 10px;
+  gap: 9px;
 }
 
 .list-item:hover,
@@ -692,12 +692,21 @@ button.list-item.active {
   font-weight: 600;
 }
 
-.weight-summary,
 .portfolio-note,
 .allocation-legend {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.weight-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.weight-summary .weight-bar {
+  flex: 1;
 }
 
 .weight-chip,
@@ -743,8 +752,8 @@ button.list-item.active {
 }
 
 .portfolio-summary {
-  gap: 12px;
-  padding: 14px;
+  gap: 10px;
+  padding: 13px;
 }
 
 .portfolio-owner-row {
@@ -759,33 +768,33 @@ button.list-item.active {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 14px;
   align-items: center;
-  padding: 12px 14px;
-  border-radius: 20px;
+  padding: 9px 12px;
+  border-radius: 16px;
   background: linear-gradient(180deg, #fbfbfd 0%, #f5f7fb 100%);
   border: 1px solid rgba(229, 229, 234, 0.78);
 }
 
 .portfolio-focus-label {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 650;
 }
 
 .portfolio-focus-title {
-  margin-top: 3px;
-  font-size: 21px;
+  margin-top: 2px;
+  font-size: 17px;
   line-height: 1.05;
   font-weight: 820;
   overflow-wrap: anywhere;
 }
 
 .portfolio-stat-grid-compact .portfolio-stat {
-  padding: 10px 12px;
-  border-radius: 16px;
+  padding: 8px 10px;
+  border-radius: 14px;
 }
 
 .portfolio-stat-grid-compact .portfolio-stat-value {
-  font-size: 16px;
+  font-size: 15px;
 }
 
 .section-wide {
@@ -1918,50 +1927,83 @@ button.list-item.active {
 }
 
 .import-loading-card {
-  padding: 14px;
-  border-radius: 22px;
-  background: var(--accent-soft);
-  border: 1px solid rgba(0, 122, 255, 0.16);
+  padding: 16px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(0, 122, 255, 0.10), rgba(90, 200, 250, 0.08));
+  border: 1px solid rgba(0, 122, 255, 0.18);
+  display: grid;
+  gap: 14px;
+}
+
+.import-loading-head {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 12px;
-  align-items: start;
+  align-items: center;
 }
 
-.import-spinner {
-  width: 22px;
-  height: 22px;
+.import-orb {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
   border-radius: 50%;
-  border: 2px solid rgba(0, 122, 255, 0.2);
+  background: rgba(0, 122, 255, 0.14);
+}
+
+.import-orb::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid transparent;
   border-top-color: var(--accent);
-  animation: import-spin 900ms linear infinite;
+  border-right-color: var(--accent);
+  animation: import-spin 820ms linear infinite;
+}
+
+.import-orb-core {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: import-pulse 1.4s ease-in-out infinite;
 }
 
 .import-loading-title {
   font-size: 15px;
   font-weight: 760;
+  display: block;
 }
 
-.import-progress-track {
+.import-loading-step {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.import-shimmer-track {
+  position: relative;
   height: 6px;
-  margin-top: 10px;
   border-radius: 999px;
   overflow: hidden;
   background: rgba(0, 122, 255, 0.14);
 }
 
-.import-progress-fill {
+.import-shimmer-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 45%;
   height: 100%;
-  border-radius: inherit;
-  background: var(--accent);
-  transition: width 240ms var(--ease-standard);
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(10, 132, 255, 0) 0%, var(--accent) 50%, rgba(10, 132, 255, 0) 100%);
 }
 
-.import-loading-copy {
-  margin-top: 8px;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.45;
+@keyframes import-pulse {
+  0%, 100% { transform: scale(0.7); opacity: 0.6; }
+  50% { transform: scale(1); opacity: 1; }
 }
 
 .ai-advice-card {

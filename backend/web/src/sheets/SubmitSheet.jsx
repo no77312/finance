@@ -156,9 +156,9 @@ function ScreenshotImport({ group }) {
       const parsed = []
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
-        actions.patch({ importProgress: { active: true, current: i + 1, total: files.length, fileName: file.name, title: '正在读取截图' } })
+        actions.patch({ importProgress: { active: true, current: i + 1, total: files.length, title: '正在读取截图' } })
         const imageDataURL = await imageFileToDataURL(file)
-        actions.patch({ importProgress: { active: true, current: i + 1, total: files.length, fileName: file.name, title: '正在识别持仓' } })
+        actions.patch({ importProgress: { active: true, current: i + 1, total: files.length, title: '正在识别持仓' } })
         const result = await actions.callApi('/api/imports/parse-screenshot', {
           method: 'POST',
           body: { imageDataURL, defaultVisibility, brokerHint, locale: 'zh-CN' },
@@ -219,16 +219,42 @@ function ScreenshotImport({ group }) {
 }
 
 function ImportProgress({ progress }) {
-  const pct = Math.max(8, Math.min(100, Math.round((progress.current / progress.total) * 100)))
   return (
-    <motion.section className="import-loading-card" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-      <span className="import-spinner" />
-      <strong>{progress.title}</strong>
-      {progress.fileName && (
-        <span className="subtle">第 {progress.current}/{progress.total} 张：{progress.fileName}</span>
-      )}
-      <div className="import-progress-track">
-        <motion.div className="import-progress-fill" animate={{ width: `${pct}%` }} transition={{ duration: 0.24 }} />
+    <motion.section
+      className="import-loading-card"
+      initial={{ opacity: 0, y: 10, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.98 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 26 }}
+    >
+      <div className="import-loading-head">
+        <span className="import-orb">
+          <span className="import-orb-core" />
+        </span>
+        <div className="min-w-0">
+          <AnimatePresence mode="wait">
+            <motion.strong
+              key={progress.title}
+              className="import-loading-title"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.22 }}
+            >
+              {progress.title}
+            </motion.strong>
+          </AnimatePresence>
+          {progress.total > 1 && (
+            <div className="import-loading-step">第 {progress.current}/{progress.total} 张</div>
+          )}
+        </div>
+      </div>
+      <div className="import-shimmer-track">
+        <motion.div
+          className="import-shimmer-bar"
+          animate={{ x: ['-60%', '160%'] }}
+          transition={{ duration: 1.1, ease: 'easeInOut', repeat: Infinity }}
+        />
       </div>
     </motion.section>
   )
