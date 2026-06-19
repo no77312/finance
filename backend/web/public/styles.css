@@ -43,9 +43,7 @@ html {
 
 body {
   margin: 0;
-  background:
-    radial-gradient(circle at top, rgba(0, 122, 255, 0.06), transparent 32%),
-    linear-gradient(180deg, #ffffff 0%, #fbfbfd 100%);
+  background: #f5f6f8;
   color: var(--ink);
   font-size: 16px;
   letter-spacing: 0;
@@ -53,7 +51,7 @@ body {
 }
 
 html.sheet-open body {
-  background: #f2f2f7;
+  background: #f5f6f8;
 }
 
 button,
@@ -331,18 +329,26 @@ button:disabled {
 .field select,
 .field textarea {
   width: 100%;
-  border: 1px solid var(--line);
-  background: var(--control);
+  border: 1px solid rgba(60, 60, 67, 0.14);
+  background: #ffffff;
   color: var(--ink);
-  border-radius: var(--radius-sm);
-  min-height: 48px;
-  padding: 12px 14px;
+  border-radius: 14px;
+  min-height: 50px;
+  padding: 13px 15px;
   outline: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: border-color 160ms var(--ease-standard), box-shadow 160ms var(--ease-standard);
+}
+
+.field input::placeholder,
+.field textarea::placeholder {
+  color: #b0b0b8;
 }
 
 .field textarea {
   min-height: 92px;
   resize: vertical;
+  line-height: 1.5;
 }
 
 .group-select:focus,
@@ -350,7 +356,7 @@ button:disabled {
 .field select:focus,
 .field textarea:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.14);
+  box-shadow: 0 0 0 3.5px rgba(0, 122, 255, 0.14);
 }
 
 .content {
@@ -1550,15 +1556,12 @@ button.list-item.active {
 .tabbar-item {
   position: relative;
   z-index: 1;
-  min-height: 50px;
+  min-height: 48px;
   display: grid;
   place-items: center;
-  gap: 2px;
   background: transparent;
   color: var(--muted);
   border-radius: 22px;
-  font-size: 12px;
-  font-weight: 650;
   transition: color 200ms var(--ease-standard);
 }
 
@@ -1569,10 +1572,6 @@ button.list-item.active {
 
 .tabbar-item.active {
   color: #ffffff;
-}
-
-.tabbar-item.active .tabbar-label {
-  font-weight: 720;
 }
 
 .sheet {
@@ -2450,18 +2449,6 @@ button.list-item.active {
   font-weight: 740;
 }
 
-.profile-edit-form .field textarea {
-  resize: none;
-  font: inherit;
-  width: 100%;
-  padding: 11px 12px;
-  border-radius: 14px;
-  border: 1px solid var(--control-strong);
-  background: var(--control);
-  color: var(--ink);
-  line-height: 1.5;
-}
-
 .field-hint {
   align-self: flex-end;
   font-size: 11px;
@@ -2534,12 +2521,12 @@ button.list-item.active {
 /* 群组创建/加入卡片 */
 .group-form-card {
   display: grid;
-  gap: 12px;
-  padding: 16px;
-  border-radius: 20px;
-  background: var(--panel);
-  border: 0.5px solid rgba(60, 60, 67, 0.12);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.05);
+  gap: 14px;
+  padding: 18px;
+  border-radius: 22px;
+  background: linear-gradient(165deg, rgba(0, 122, 255, 0.06), rgba(0, 122, 255, 0.02));
+  border: 1px solid rgba(0, 122, 255, 0.16);
+  box-shadow: 0 8px 24px rgba(0, 122, 255, 0.06);
 }
 
 .group-form-head {
@@ -2557,19 +2544,17 @@ button.list-item.active {
 .group-form-icon {
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
   color: #fff;
   flex: none;
-}
-
-.group-form-icon.create {
   background: linear-gradient(135deg, #0a84ff, #5ac8fa);
+  box-shadow: 0 6px 14px rgba(10, 132, 255, 0.28);
 }
 
 .group-form-icon.join {
-  background: linear-gradient(135deg, #34c759, #30d158);
+  background: linear-gradient(135deg, #0a84ff, #5ac8fa);
 }
 
 .invite-code-input {

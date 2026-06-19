@@ -107,15 +107,15 @@ function Tabbar() {
             key={tab.value}
             className={`tabbar-item ${active ? 'active' : ''}`}
             onClick={() => actions.patch({ activeTab: tab.value, sheet: '' })}
+            aria-label={tab.label}
           >
             <motion.span
               className="tabbar-icon"
-              animate={{ scale: active ? 1.06 : 1 }}
+              animate={{ scale: active ? 1.08 : 1 }}
               transition={SPRING}
             >
-              <Icon name={tab.icon} size={22} />
+              <Icon name={tab.icon} size={24} />
             </motion.span>
-            <span className="tabbar-label">{tab.label}</span>
           </button>
         )
       })}
