@@ -1630,8 +1630,9 @@ button.list-item.active {
 }
 
 .group-menu-item.active {
-  background: linear-gradient(180deg, #ffffff 0%, #f3f8ff 100%);
-  border-color: rgba(var(--accent-rgb), 0.22);
+  background: var(--accent-gradient);
+  border-color: rgba(255, 255, 255, 0.36);
+  box-shadow: 0 10px 24px rgba(var(--accent-rgb), 0.16);
 }
 
 .group-menu-copy {
@@ -1658,8 +1659,17 @@ button.list-item.active {
 }
 
 .group-menu-item.active .group-name-bubble {
-  color: var(--accent);
-  background: rgba(var(--accent-rgb), 0.13);
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.group-menu-item.active .group-menu-item-meta {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.group-menu-item.active .group-menu-action {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .group-menu-item-meta {
@@ -1686,8 +1696,8 @@ button.list-item.active {
 }
 
 .group-menu-status.active {
-  background: var(--accent-gradient);
-  color: #ffffff;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--accent);
 }
 
 .group-manage-card {
