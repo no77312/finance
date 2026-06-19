@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 import { useStore } from '../store/StoreContext.jsx'
 import { Avatar } from '../components/Avatar.jsx'
 import Icon from '../components/Icon.jsx'
-import { AllocationStrip, LegendChips, DonutChart } from '../components/Visuals.jsx'
+import { AllocationStrip, LegendChips } from '../components/Visuals.jsx'
 import AnimatedNumber from '../components/AnimatedNumber.jsx'
 import { money, formatPercent, formatDateTime, signedPercentPoint } from '../utils/format.js'
 import { visibleSummary, exposureRows, groupMarketRows, labelForMarket } from '../utils/finance.js'
@@ -43,8 +43,12 @@ export default function OverviewView({ group }) {
   const activeMembers = membersWithRecentSnapshots(data, group.id, 24)
   const activity = members.length > 0 ? activeMembers.size / members.length : 0
 
-  const submittedRatio = members.length > 0 ? contributingIDs.size / members.length : 0
-  const marketSlices = marketRows.map((row) => ({ market: row.market, label: labelForMarket(row.market), weight: row.weight }))
+  const kpis = [
+    { label: '已提交', value: `${contributingIDs.size}/${members.length || 0}` },
+    { label: '可见市值', node: <AnimatedNumber value={summary.marketValue} format={(v) => money(v)} /> },
+    { label: '共识标的', value: `${consensus.length}` },
+    { label: '最近更新', value: latestAt ? formatDateTime(latestAt) : '等待提交' },
+  ]
 
   return (
     <main className="content overview-layout">
@@ -64,27 +68,30 @@ export default function OverviewView({ group }) {
           </motion.button>
         </div>
 
-        <div className="overview-hero">
-          <div className="overview-hero-value">
-            <span className="overview-hero-label">可见总市值</span>
-            <strong className="overview-hero-number">
-              <AnimatedNumber value={summary.marketValue} format={(v) => money(v)} />
-            </strong>
-            <div className="overview-hero-tags">
-              <span className="hero-tag accent">已提交 {contributingIDs.size}/{members.length || 0}</span>
-              <span className="hero-tag">共识 {consensus.length}</span>
-              <span className="hero-tag">{latestAt ? formatDateTime(latestAt) : '等待提交'}</span>
-            </div>
-          </div>
-          <div className="overview-hero-chart">
-            <DonutChart
-              slices={marketSlices}
-              size={120}
-              thickness={16}
-              centerValue={`${Math.round(submittedRatio * 100)}%`}
-              centerLabel="已提交"
-            />
-          </div>
+        <div className="overview-kpi-row">
+          {kpis.map((kpi, i) => (
+            <motion.div
+              key={kpi.label}
+              className="overview-kpi"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 * i, type: 'spring', stiffness: 300, damping: 26 }}
+            >
+              <span>{kpi.label}</span>
+              <strong>{kpi.node ?? kpi.value}</strong>
+            </motion.div>
+          ))}
+        </div>
+
+        <div className="overview-signal-list">
+          <SignalRow label="共识强度" detail={`${consensus.length} 个多人持有标的`} value={formatPercent(consensusStrength)} progress={consensusStrength} />
+          <SignalRow
+            label="集中度 Top3"
+            detail={top3.map((e) => e.symbol).join(' · ') || '暂无'}
+            value={formatPercent(top3Weight)}
+            progress={top3Weight}
+          />
+          <SignalRow label="活跃度" detail={`近 24h ${activeMembers.size}/${members.length} 位提交`} value={formatPercent(activity)} progress={activity} />
         </div>
 
         <div className="overview-market-row">
@@ -100,17 +107,6 @@ export default function OverviewView({ group }) {
               ))
             )}
           </div>
-        </div>
-
-        <div className="overview-signal-list">
-          <SignalRow label="共识强度" detail={`${consensus.length} 个多人持有标的`} value={formatPercent(consensusStrength)} progress={consensusStrength} />
-          <SignalRow
-            label="集中度 Top3"
-            detail={top3.map((e) => e.symbol).join(' · ') || '暂无'}
-            value={formatPercent(top3Weight)}
-            progress={top3Weight}
-          />
-          <SignalRow label="活跃度" detail={`近 24h ${activeMembers.size}/${members.length} 位提交`} value={formatPercent(activity)} progress={activity} />
         </div>
       </motion.section>
 

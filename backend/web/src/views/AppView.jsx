@@ -1,4 +1,3 @@
-import { useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useStore, activeGroupFor } from '../store/StoreContext.jsx'
 import Icon from '../components/Icon.jsx'
@@ -16,42 +15,11 @@ const TABS = [
 const TAB_INDEX = { overview: 0, members: 1, mine: 2 }
 
 const SPRING = { type: 'spring', stiffness: 420, damping: 36, mass: 0.7 }
-const PAGE_TWEEN = { type: 'tween', duration: 0.34, ease: [0.32, 0.72, 0, 1] }
-
-const pageVariants = {
-  enter: (dir) => ({ x: `${dir * 100}%` }),
-  center: { x: '0%' },
-  exit: (dir) => ({ x: `${dir * -100}%` }),
-}
-
-const TAB_ORDER = ['overview', 'members', 'mine']
-const SWIPE_THRESHOLD = 60
+const PAGE_FADE = { duration: 0.18, ease: [0.33, 0, 0.2, 1] }
 
 export default function AppView() {
-  const { state, actions } = useStore()
+  const { state } = useStore()
   const group = activeGroupFor(state)
-  const prevIndex = useRef(TAB_INDEX[state.activeTab] ?? 0)
-  const currentIndex = TAB_INDEX[state.activeTab] ?? 0
-  const dir = currentIndex >= prevIndex.current ? 1 : -1
-  prevIndex.current = currentIndex
-
-  const goTo = (nextIndex) => {
-    const clamped = Math.max(0, Math.min(TAB_ORDER.length - 1, nextIndex))
-    const nextTab = TAB_ORDER[clamped]
-    if (nextTab && nextTab !== state.activeTab) {
-      actions.patch({ activeTab: nextTab, sheet: '' })
-    }
-  }
-
-  const handleDragEnd = (_event, info) => {
-    const offset = info.offset.x
-    const velocity = info.velocity.x
-    if (offset < -SWIPE_THRESHOLD || velocity < -500) {
-      goTo(currentIndex + 1)
-    } else if (offset > SWIPE_THRESHOLD || velocity > 500) {
-      goTo(currentIndex - 1)
-    }
-  }
 
   return (
     <div className="app-shell">
@@ -59,22 +27,14 @@ export default function AppView() {
 
       {group ? (
         <div className="page-viewport">
-          <AnimatePresence mode="popLayout" initial={false} custom={dir}>
+          <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={state.activeTab}
               className="page-slide"
-              custom={dir}
-              variants={pageVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={PAGE_TWEEN}
-              drag="x"
-              dragElastic={0.18}
-              dragMomentum={false}
-              dragConstraints={{ left: 0, right: 0 }}
-              onDragEnd={handleDragEnd}
-              style={{ willChange: 'transform', touchAction: 'pan-y' }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={PAGE_FADE}
             >
               {state.activeTab === 'members' ? (
                 <MembersView group={group} />

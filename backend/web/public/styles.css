@@ -21,7 +21,7 @@
   --radius-md: 24px;
   --radius-lg: 30px;
   --radius-pill: 999px;
-  --shadow: 0 18px 48px rgba(0, 0, 0, 0.08);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
@@ -482,7 +482,7 @@ button:disabled {
 .panel:hover,
 .form-panel:hover {
   transform: translateY(-2px);
-  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.09);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
 }
 
 button.list-item {
@@ -889,88 +889,33 @@ button.list-item.active {
   align-items: center;
 }
 
-.overview-hero {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 16px;
-  border-radius: 22px;
-  background: linear-gradient(160deg, rgba(10, 132, 255, 0.10), rgba(90, 200, 250, 0.04));
-  border: 1px solid rgba(10, 132, 255, 0.14);
+.overview-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 8px;
 }
 
-.overview-hero-value {
-  display: grid;
-  gap: 6px;
+.overview-kpi {
   min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 18px;
+  background: var(--control);
 }
 
-.overview-hero-label {
+.overview-kpi span {
   color: var(--muted);
-  font-size: 12px;
-  font-weight: 660;
-}
-
-.overview-hero-number {
-  font-size: 30px;
-  line-height: 1.05;
-  font-weight: 840;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-}
-
-.overview-hero-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 2px;
-}
-
-.hero-tag {
   font-size: 11px;
-  font-weight: 640;
-  padding: 4px 9px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.7);
-  color: var(--muted);
+  font-weight: 650;
+  white-space: nowrap;
 }
 
-.hero-tag.accent {
-  background: var(--accent);
-  color: #fff;
-}
-
-.overview-hero-chart {
-  flex: none;
-}
-
-.donut-chart {
-  position: relative;
-  display: grid;
-  place-items: center;
-}
-
-.donut-center {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  gap: 0;
-  text-align: center;
-}
-
-.donut-center strong {
-  font-size: 20px;
-  line-height: 1;
-  font-weight: 840;
-  font-variant-numeric: tabular-nums;
-}
-
-.donut-center span {
-  font-size: 10px;
-  color: var(--muted);
-  font-weight: 640;
+.overview-kpi strong {
+  font-size: 14px;
+  line-height: 1.15;
+  font-weight: 800;
+  overflow-wrap: anywhere;
 }
 
 .overview-signal-list {
@@ -1598,7 +1543,7 @@ button.list-item.active {
   position: fixed;
   z-index: 20;
   left: 50%;
-  bottom: calc(16px + env(safe-area-inset-bottom));
+  bottom: calc(6px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
   width: min(calc(100% - 36px), 420px);
   display: grid;
