@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import { useStore } from '../store/StoreContext.jsx'
 import { Avatar } from '../components/Avatar.jsx'
+import Icon from '../components/Icon.jsx'
 import PortfolioSection from '../components/PortfolioSection.jsx'
 import { formatDateTime, formatNumber } from '../utils/format.js'
 import { buildPortfolioInsights } from '../utils/insights.js'
@@ -23,9 +24,9 @@ export default function MineView({ group }) {
       <section className="section-wide">
         <motion.div
           className="panel profile-card"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ type: 'spring', stiffness: 240, damping: 26 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.25 }}
         >
           <div className="profile-card-head">
             <div className="member-overview-name">
@@ -35,8 +36,8 @@ export default function MineView({ group }) {
                 <div className="account-mail">{user?.email ?? ''}</div>
               </div>
             </div>
-            <motion.button className="icon-button profile-close-button" whileTap={{ scale: 0.9 }} onClick={actions.clearSession}>
-              ×
+            <motion.button className="icon-button profile-close-button" whileTap={{ scale: 0.9 }} onClick={actions.clearSession} aria-label="退出登录">
+              <Icon name="close" size={18} />
             </motion.button>
           </div>
           <div className="profile-meta-row">

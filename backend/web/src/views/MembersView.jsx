@@ -24,14 +24,20 @@ export default function MembersView({ group }) {
         whileHover={{ y: -2 }}
         onClick={() => actions.patch({ sheet: 'member-select' })}
       >
-        <span className="member-overview-name">
+        <span className="member-selector-id">
           <Avatar member={selected} />
-          <span>{selected?.displayName ?? '选择成员'}</span>
+          <span className="min-w-0">
+            <span className="member-selector-hint">查看成员 · 点击切换</span>
+            <span className="member-selector-name">{selected?.displayName ?? '选择成员'}</span>
+          </span>
         </span>
         <span className="member-selector-value">
           {insights && <strong>{money(insights.totalVisibleValue)}</strong>}
+          {members.length > 1 && <span>共 {members.length} 人</span>}
         </span>
-        <Icon name="chevron" size={18} />
+        <span className="member-selector-chevron">
+          <Icon name="chevron" size={16} />
+        </span>
       </motion.button>
 
       {selected && insights && (

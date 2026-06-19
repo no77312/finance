@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import Icon from '../components/Icon.jsx'
 
 // 通用底部 sheet 容器：遮罩淡入 + 面板弹簧上滑，支持退场
 export default function Sheet({ children, onClose, compact }) {
@@ -30,16 +31,18 @@ export function SheetHeader({ title, subtitle, onClose, onBack }) {
   return (
     <div className={`sheet-header ${onBack ? 'sheet-header-nav' : ''}`}>
       {onBack && (
-        <button className="icon-button" onClick={onBack}>
-          ‹
+        <button className="icon-button" onClick={onBack} aria-label="返回">
+          <span style={{ transform: 'rotate(180deg)', display: 'grid' }}>
+            <Icon name="chevron" size={18} />
+          </span>
         </button>
       )}
       <div>
-        <h2>{title}</h2>
+        <h2 className="sheet-title">{title}</h2>
         {subtitle && <p className="subtle">{subtitle}</p>}
       </div>
-      <button className="icon-button" onClick={onClose}>
-        ×
+      <button className="icon-button" onClick={onClose} aria-label="关闭">
+        <Icon name="close" size={18} />
       </button>
     </div>
   )
