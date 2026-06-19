@@ -29,9 +29,9 @@ export default function MineView({ group }) {
         <motion.button
           type="button"
           className="panel profile-card profile-card-button"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.25 }}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: 'spring', stiffness: 340, damping: 30 }}
           whileTap={{ scale: 0.99 }}
           onClick={() => actions.patch({ sheet: 'profile-edit' })}
         >

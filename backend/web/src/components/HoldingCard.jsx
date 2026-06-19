@@ -32,8 +32,8 @@ export default function HoldingCard({ holding, currentMemberID, weight, editable
   return (
     <motion.article
       className="list-item holding-card"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.96, height: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0 }}
       transition={{ type: 'spring', stiffness: 360, damping: 34, mass: 0.7 }}
       whileHover={{ y: -2 }}

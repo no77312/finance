@@ -901,7 +901,8 @@ button.list-item.active {
   gap: 2px;
   padding: 10px 12px;
   border-radius: 18px;
-  background: var(--control);
+  background: rgba(10, 132, 255, 0.08);
+  border: 1.5px solid rgba(10, 132, 255, 0.18);
 }
 
 .overview-kpi span {
@@ -2026,8 +2027,8 @@ button.list-item.active {
 .import-loading-card {
   padding: 16px;
   border-radius: 20px;
-  background: linear-gradient(135deg, rgba(0, 122, 255, 0.10), rgba(90, 200, 250, 0.08));
-  border: 1px solid rgba(0, 122, 255, 0.18);
+  background: rgba(10, 132, 255, 0.08);
+  border: 1.5px solid rgba(10, 132, 255, 0.18);
   display: grid;
   gap: 14px;
 }
@@ -2536,9 +2537,8 @@ button.list-item.active {
   gap: 14px;
   padding: 18px;
   border-radius: 22px;
-  background: linear-gradient(165deg, rgba(0, 122, 255, 0.06), rgba(0, 122, 255, 0.02));
-  border: 1px solid rgba(0, 122, 255, 0.16);
-  box-shadow: 0 8px 24px rgba(0, 122, 255, 0.06);
+  background: rgba(10, 132, 255, 0.08);
+  border: 1.5px solid rgba(10, 132, 255, 0.18);
 }
 
 .group-form-head {
@@ -2581,8 +2581,8 @@ button.list-item.active {
   gap: 8px;
   padding: 16px;
   border-radius: 20px;
-  background: linear-gradient(160deg, rgba(10, 132, 255, 0.10), rgba(90, 200, 250, 0.06));
-  border: 0.5px solid rgba(10, 132, 255, 0.18);
+  background: rgba(10, 132, 255, 0.08);
+  border: 1.5px solid rgba(10, 132, 255, 0.18);
 }
 
 .advice-overview-card h3 {

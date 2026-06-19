@@ -69,11 +69,17 @@ export default function OverviewView({ group }) {
         </div>
 
         <div className="overview-kpi-row">
-          {kpis.map((kpi) => (
-            <div key={kpi.label} className="overview-kpi">
+          {kpis.map((kpi, i) => (
+            <motion.div
+              key={kpi.label}
+              className="overview-kpi"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.04, type: 'spring', stiffness: 340, damping: 30 }}
+            >
               <span>{kpi.label}</span>
               <strong>{kpi.node ?? kpi.value}</strong>
-            </div>
+            </motion.div>
           ))}
         </div>
 
