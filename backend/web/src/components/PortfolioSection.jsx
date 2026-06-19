@@ -34,6 +34,7 @@ export default function PortfolioSection({
       </div>
 
       <motion.div
+        layout
         className="panel portfolio-summary"
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}

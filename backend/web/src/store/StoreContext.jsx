@@ -19,6 +19,7 @@ const initialState = {
   adviceByGroupID: {},
   adviceLoadingGroupID: '',
   adviceError: '',
+  confirm: null,
   message: '',
   error: '',
   busy: false,
@@ -55,6 +56,7 @@ export function StoreProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState)
   const stateRef = useRef(state)
   const noticeTimer = useRef(0)
+  const confirmAction = useRef(null)
 
   useEffect(() => {
     stateRef.current = state
@@ -96,6 +98,24 @@ export function StoreProvider({ children }) {
       }
     },
     [patch, setNotice],
+  )
+
+  const requestConfirm = useCallback(
+    (options, onConfirm) => {
+      confirmAction.current = onConfirm
+      patch({ confirm: options })
+    },
+    [patch],
+  )
+
+  const resolveConfirm = useCallback(
+    (confirmed) => {
+      const action = confirmAction.current
+      confirmAction.current = null
+      patch({ confirm: null })
+      if (confirmed && action) action()
+    },
+    [patch],
   )
 
   const refreshBootstrap = useCallback(async () => {
@@ -206,28 +226,44 @@ export function StoreProvider({ children }) {
 
   const leaveGroup = useCallback(
     (groupID) => {
-      if (!window.confirm('确定退出该群组？你在该群组的持仓将被移除。')) return
-      return runBusy(async () => {
-        await callApi(`/api/groups/${groupID}/membership`, { method: 'DELETE' })
-        await refreshBootstrap()
-        patch({ sheet: '', manageGroupID: '', selectedMemberID: '' })
-        setNotice('success', '已退出群组')
-      })
+      requestConfirm(
+        {
+          title: '退出群组？',
+          message: '你在该群组的持仓会被移除，其他群组不受影响。',
+          confirmLabel: '退出群组',
+          tone: 'danger',
+        },
+        () =>
+          runBusy(async () => {
+            await callApi(`/api/groups/${groupID}/membership`, { method: 'DELETE' })
+            await refreshBootstrap()
+            patch({ sheet: '', manageGroupID: '', selectedMemberID: '' })
+            setNotice('success', '已退出群组')
+          }),
+      )
     },
-    [runBusy, callApi, refreshBootstrap, patch, setNotice],
+    [requestConfirm, runBusy, callApi, refreshBootstrap, patch, setNotice],
   )
 
   const deleteGroup = useCallback(
     (groupID) => {
-      if (!window.confirm('确定解散该群组？所有成员的数据将被删除。')) return
-      return runBusy(async () => {
-        await callApi(`/api/groups/${groupID}`, { method: 'DELETE' })
-        await refreshBootstrap()
-        patch({ sheet: '', manageGroupID: '', selectedMemberID: '' })
-        setNotice('success', '群组已解散')
-      })
+      requestConfirm(
+        {
+          title: '解散群组？',
+          message: '群组内所有成员和持仓数据都会被删除，这个操作不可撤销。',
+          confirmLabel: '解散群组',
+          tone: 'danger',
+        },
+        () =>
+          runBusy(async () => {
+            await callApi(`/api/groups/${groupID}`, { method: 'DELETE' })
+            await refreshBootstrap()
+            patch({ sheet: '', manageGroupID: '', selectedMemberID: '' })
+            setNotice('success', '群组已解散')
+          }),
+      )
     },
-    [runBusy, callApi, refreshBootstrap, patch, setNotice],
+    [requestConfirm, runBusy, callApi, refreshBootstrap, patch, setNotice],
   )
 
   // ---- 持仓 ----
@@ -247,14 +283,22 @@ export function StoreProvider({ children }) {
 
   const deleteHolding = useCallback(
     (groupID, holdingID) => {
-      if (!window.confirm('确定删除该持仓？')) return
-      return runBusy(async () => {
-        await callApi(`/api/groups/${groupID}/holdings/${holdingID}`, { method: 'DELETE' })
-        await refreshBootstrap()
-        setNotice('success', '持仓已删除')
-      })
+      requestConfirm(
+        {
+          title: '删除持仓？',
+          message: '这条持仓会从当前组合中移除，删除后会记录在变动历史里。',
+          confirmLabel: '删除',
+          tone: 'danger',
+        },
+        () =>
+          runBusy(async () => {
+            await callApi(`/api/groups/${groupID}/holdings/${holdingID}`, { method: 'DELETE' })
+            await refreshBootstrap()
+            setNotice('success', '持仓已删除')
+          }),
+      )
     },
-    [runBusy, callApi, refreshBootstrap, setNotice],
+    [requestConfirm, runBusy, callApi, refreshBootstrap, setNotice],
   )
 
   const importDrafts = useCallback(
@@ -345,6 +389,8 @@ export function StoreProvider({ children }) {
       setNotice,
       clearNotice,
       runBusy,
+      requestConfirm,
+      resolveConfirm,
       refreshBootstrap,
       clearSession,
       signInWithGoogle,
@@ -361,7 +407,7 @@ export function StoreProvider({ children }) {
       updateProfile,
     }),
     [
-      patch, getState, callApi, setNotice, clearNotice, runBusy, refreshBootstrap, clearSession,
+      patch, getState, callApi, setNotice, clearNotice, runBusy, requestConfirm, resolveConfirm, refreshBootstrap, clearSession,
       signInWithGoogle, signInWithDevice, createGroup, joinGroup, leaveGroup, deleteGroup, saveHolding,
       deleteHolding, importDrafts, loadGroupAdvice, copyInviteCode, updateProfile,
     ],

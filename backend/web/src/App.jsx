@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { AnimatePresence, MotionConfig, motion } from 'framer-motion'
 import { StoreProvider } from './store/StoreContext.jsx'
 import { useStore } from './store/useStore.js'
 import { api } from './api/client.js'
@@ -49,11 +50,11 @@ function Root() {
 
   // 同步 sheet-open class 与 theme-color
   useEffect(() => {
-    const open = Boolean(state.sheet)
+    const open = Boolean(state.sheet || state.confirm)
     document.documentElement.classList.toggle('sheet-open', open)
     const meta = document.querySelector('meta[name="theme-color"]')
     if (meta) meta.setAttribute('content', open ? '#f5f6f8' : '#ffffff')
-  }, [state.sheet])
+  }, [state.sheet, state.confirm])
 
   if (state.booting) {
     return (
@@ -70,15 +71,40 @@ function Root() {
   return (
     <>
       {state.session ? <AppView /> : <LoginView />}
+      <GlobalActivityBar active={state.busy} />
       <Toast />
     </>
   )
 }
 
+function GlobalActivityBar({ active }) {
+  return (
+    <div className="activity-layer" aria-hidden="true">
+      <AnimatePresence>
+        {active && (
+          <motion.div
+            className="activity-bar"
+            initial={{ opacity: 0, scaleX: 0.18, x: '-38%' }}
+            animate={{ opacity: 1, scaleX: 1, x: ['-42%', '42%'] }}
+            exit={{ opacity: 0, scaleX: 0.24 }}
+            transition={{
+              opacity: { duration: 0.16 },
+              scaleX: { duration: 0.24, ease: [0.16, 1, 0.3, 1] },
+              x: { duration: 1.05, ease: 'easeInOut', repeat: Infinity },
+            }}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 export default function App() {
   return (
-    <StoreProvider>
-      <Root />
-    </StoreProvider>
+    <MotionConfig reducedMotion="user" transition={{ ease: [0.16, 1, 0.3, 1] }}>
+      <StoreProvider>
+        <Root />
+      </StoreProvider>
+    </MotionConfig>
   )
 }

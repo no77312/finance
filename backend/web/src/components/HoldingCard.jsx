@@ -19,6 +19,7 @@ export default function HoldingCard({ holding, currentMemberID, weight, toneInde
 
   return (
     <motion.article
+      layout="position"
       className="list-item holding-card"
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}

@@ -1,4 +1,5 @@
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, LayoutGroup, motion } from 'framer-motion'
+import { useEffect, useRef } from 'react'
 import { useStore } from '../store/useStore.js'
 import { activeGroupFor } from '../store/selectors.js'
 import Icon from '../components/Icon.jsx'
@@ -21,32 +22,39 @@ const PAGE_TRANSITION = { duration: 0.24, ease: [0.16, 1, 0.3, 1] }
 export default function AppView() {
   const { state } = useStore()
   const group = activeGroupFor(state)
+  const shellRef = useRef(null)
+
+  useEffect(() => {
+    shellRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [state.activeTab, state.activeGroupID])
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" ref={shellRef}>
       <Topbar group={group} />
 
       {group ? (
-        <div className="page-viewport">
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.div
-              key={state.activeTab}
-              className="page-slide"
-              initial={{ opacity: 0, y: 8, scale: 0.996 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -5, scale: 0.998 }}
-              transition={PAGE_TRANSITION}
-            >
-              {state.activeTab === 'members' ? (
-                <MembersView group={group} />
-              ) : state.activeTab === 'mine' ? (
-                <MineView group={group} />
-              ) : (
-                <OverviewView group={group} />
-              )}
-            </motion.div>
-          </AnimatePresence>
-        </div>
+        <LayoutGroup id={`group-${group.id}`}>
+          <div className="page-viewport">
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={state.activeTab}
+                className="page-slide"
+                initial={{ opacity: 0, y: 8, scale: 0.996 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -5, scale: 0.998 }}
+                transition={PAGE_TRANSITION}
+              >
+                {state.activeTab === 'members' ? (
+                  <MembersView group={group} />
+                ) : state.activeTab === 'mine' ? (
+                  <MineView group={group} />
+                ) : (
+                  <OverviewView group={group} />
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        </LayoutGroup>
       ) : (
         <EmptyWorkspace />
       )}

@@ -6,6 +6,7 @@ import MemberSelectSheet from './MemberSelectSheet.jsx'
 import AiAdviceSheet from './AiAdviceSheet.jsx'
 import SubmitSheet from './SubmitSheet.jsx'
 import ProfileEditSheet from './ProfileEditSheet.jsx'
+import ConfirmSheet from './ConfirmSheet.jsx'
 
 export default function SheetHost() {
   const { state } = useStore()
@@ -17,6 +18,7 @@ export default function SheetHost() {
       {state.sheet === 'ai-advice' && <AiAdviceSheet key="ai-advice" />}
       {state.sheet === 'submit' && <SubmitSheet key="submit" />}
       {state.sheet === 'profile-edit' && <ProfileEditSheet key="profile-edit" />}
+      {state.confirm && <ConfirmSheet key="confirm" />}
     </AnimatePresence>
   )
 }

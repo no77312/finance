@@ -54,6 +54,10 @@ html.sheet-open body {
   background: #f5f6f8;
 }
 
+html.sheet-open .app-shell {
+  overflow: hidden;
+}
+
 button,
 input,
 select,
@@ -83,6 +87,27 @@ button {
   display: grid;
   align-content: center;
   gap: 24px;
+}
+
+.activity-layer {
+  position: fixed;
+  top: env(safe-area-inset-top);
+  left: 0;
+  right: 0;
+  z-index: 60;
+  height: 3px;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.activity-bar {
+  width: 44%;
+  height: 100%;
+  margin: 0 auto;
+  border-radius: 999px;
+  transform-origin: center;
+  background: linear-gradient(90deg, rgba(10, 132, 255, 0), rgba(10, 132, 255, 0.95), rgba(90, 200, 250, 0));
+  box-shadow: 0 0 18px rgba(10, 132, 255, 0.34);
 }
 
 .brand-mark {
@@ -375,6 +400,7 @@ button:disabled {
 
 .page-slide {
   width: 100%;
+  will-change: transform, opacity;
 }
 
 .page-viewport > .page-slide {
@@ -657,6 +683,7 @@ button.list-item.active {
   gap: 9px;
   padding: 13px;
   border-radius: 24px;
+  will-change: transform;
 }
 
 .holding-card-head {
@@ -876,6 +903,7 @@ button.list-item.active {
 .portfolio-summary {
   gap: 10px;
   padding: 13px;
+  will-change: transform;
 }
 
 .portfolio-owner-row {
@@ -1167,6 +1195,63 @@ button.list-item.active {
 .compact-sheet-panel {
   gap: 12px;
   padding: 18px;
+}
+
+.confirm-card {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 4px 2px 0;
+  text-align: center;
+}
+
+.confirm-icon {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 22px;
+  font-weight: 850;
+}
+
+.confirm-card.danger .confirm-icon {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.confirm-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.confirm-copy h2 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.2;
+  font-weight: 780;
+}
+
+.confirm-copy p {
+  max-width: 320px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.confirm-actions {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.confirm-actions button {
+  min-height: 44px;
 }
 
 .member-select-list {

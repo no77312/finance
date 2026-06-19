@@ -1,8 +1,17 @@
+import { useEffect } from 'react'
 import { motion } from 'framer-motion'
 import Icon from '../components/Icon.jsx'
 
 // 通用底部 sheet 容器：遮罩淡入 + 面板弹簧上滑，支持退场
 export default function Sheet({ children, onClose, compact }) {
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') onClose?.()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
+
   return (
     <motion.div
       className="sheet"
@@ -16,6 +25,8 @@ export default function Sheet({ children, onClose, compact }) {
     >
       <motion.section
         className={`sheet-panel ${compact ? 'compact-sheet-panel' : ''}`}
+        role="dialog"
+        aria-modal="true"
         initial={{ y: 28, scale: 0.985, opacity: 0 }}
         animate={{ y: 0, scale: 1, opacity: 1 }}
         exit={{ y: 24, scale: 0.99, opacity: 0 }}

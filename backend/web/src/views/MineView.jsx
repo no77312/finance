@@ -20,7 +20,15 @@ export default function MineView({ group }) {
   const eventLabel = { created: '提交', updated: '调整', deleted: '移除' }
 
   const logout = () => {
-    if (window.confirm('确定退出登录？')) actions.clearSession()
+    actions.requestConfirm(
+      {
+        title: '退出登录？',
+        message: '退出后本机不再保留当前登录状态，线上数据不会被删除。',
+        confirmLabel: '退出登录',
+        tone: 'danger',
+      },
+      () => actions.clearSession(),
+    )
   }
 
   return (
