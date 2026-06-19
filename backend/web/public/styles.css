@@ -876,6 +876,8 @@ button.list-item.active {
 .group-overview-panel {
   gap: 14px;
   padding: 16px;
+  background: linear-gradient(160deg, rgba(10, 132, 255, 0.12), rgba(90, 200, 250, 0.05));
+  border: 1px solid rgba(10, 132, 255, 0.18);
 }
 
 .overview-heading {
@@ -901,8 +903,8 @@ button.list-item.active {
   gap: 2px;
   padding: 10px 12px;
   border-radius: 18px;
-  background: rgba(10, 132, 255, 0.08);
-  border: 1.5px solid rgba(10, 132, 255, 0.18);
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.7);
 }
 
 .overview-kpi span {

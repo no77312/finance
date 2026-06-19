@@ -72,7 +72,13 @@ export default function AiAdviceSheet() {
               <span className="import-loading-step">结合集中度、盈亏与股价表现</span>
             </div>
           </div>
-          <div className="import-shimmer-track"><span className="import-shimmer-bar" /></div>
+          <div className="import-shimmer-track">
+            <motion.span
+              className="import-shimmer-bar"
+              animate={{ x: ['-60%', '160%'] }}
+              transition={{ duration: 1.1, ease: 'easeInOut', repeat: Infinity }}
+            />
+          </div>
         </section>
       )}
 
