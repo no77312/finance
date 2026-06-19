@@ -298,7 +298,9 @@ export function StoreProvider({ children }) {
   const loadGroupAdvice = useCallback(
     async (groupID) => {
       const current = stateRef.current
-      if (current.adviceByGroupID[groupID] || current.adviceLoadingGroupID === groupID) return
+      const cached = current.adviceByGroupID[groupID]
+      const hasMembers = Array.isArray(cached?.advice?.members) && cached.advice.members.length > 0
+      if (hasMembers || current.adviceLoadingGroupID === groupID) return
       patch({ adviceLoadingGroupID: groupID, adviceError: '' })
       try {
         const payload = await callApi(`/api/groups/${groupID}/advice`)

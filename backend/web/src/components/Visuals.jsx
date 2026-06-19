@@ -60,3 +60,55 @@ export function LegendChips({ slices = [], max = 4 }) {
     </div>
   )
 }
+
+const DONUT_COLORS = ['#0a84ff', '#5ac8fa', '#34c759', '#ff9f0a', '#ff375f', '#bf5af2']
+
+// 环形图：市场/资产分布，带描边增长动画
+export function DonutChart({ slices = [], size = 116, thickness = 16, centerLabel, centerValue }) {
+  const radius = (size - thickness) / 2
+  const circumference = 2 * Math.PI * radius
+  let offset = 0
+  const total = slices.reduce((s, x) => s + (x.weight ?? 0), 0)
+  const segments = slices
+    .filter((s) => (s.weight ?? 0) > 0)
+    .map((slice, i) => {
+      const fraction = total > 0 ? (slice.weight ?? 0) / total : 0
+      const seg = { ...slice, fraction, dash: fraction * circumference, offset }
+      offset += fraction * circumference
+      return { ...seg, color: DONUT_COLORS[i % DONUT_COLORS.length] }
+    })
+
+  return (
+    <div className="donut-chart" style={{ width: size, height: size }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(120,120,128,0.14)" strokeWidth={thickness} />
+        <g transform={`rotate(-90 ${size / 2} ${size / 2})`}>
+          {segments.map((seg, i) => (
+            <motion.circle
+              key={seg.market ?? seg.symbol ?? i}
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              fill="none"
+              stroke={seg.color}
+              strokeWidth={thickness}
+              strokeLinecap="round"
+              strokeDasharray={`${seg.dash} ${circumference - seg.dash}`}
+              initial={{ strokeDashoffset: circumference }}
+              animate={{ strokeDashoffset: -seg.offset }}
+              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.1 + i * 0.06 }}
+            />
+          ))}
+        </g>
+      </svg>
+      {(centerValue || centerLabel) && (
+        <div className="donut-center">
+          {centerValue && <strong>{centerValue}</strong>}
+          {centerLabel && <span>{centerLabel}</span>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export { DONUT_COLORS }

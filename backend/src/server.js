@@ -302,7 +302,7 @@ async function routeRequest(request, response, store, context) {
         && record.memberID === memberID
         && record.date === date
       ));
-      if (existing) {
+      if (existing && Array.isArray(existing.advice?.members) && existing.advice.members.length > 0) {
         return {
           advice: existing.advice,
           generatedAt: existing.generatedAt,

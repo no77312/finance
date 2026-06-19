@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useStore, activeGroupFor } from '../store/StoreContext.jsx'
 import Icon from '../components/Icon.jsx'
@@ -15,35 +16,50 @@ const TABS = [
 const TAB_INDEX = { overview: 0, members: 1, mine: 2 }
 
 const SPRING = { type: 'spring', stiffness: 420, damping: 36, mass: 0.7 }
+const PAGE_SPRING = { type: 'spring', stiffness: 360, damping: 38, mass: 0.8 }
+
+const pageVariants = {
+  enter: (dir) => ({ x: `${dir * 100}%`, opacity: 0.4 }),
+  center: { x: '0%', opacity: 1 },
+  exit: (dir) => ({ x: `${dir * -100}%`, opacity: 0.4 }),
+}
 
 export default function AppView() {
   const { state } = useStore()
   const group = activeGroupFor(state)
-  const dir = 1
+  const prevIndex = useRef(TAB_INDEX[state.activeTab] ?? 0)
+  const currentIndex = TAB_INDEX[state.activeTab] ?? 0
+  const dir = currentIndex >= prevIndex.current ? 1 : -1
+  prevIndex.current = currentIndex
 
   return (
     <div className="app-shell">
       <Topbar group={group} />
 
       {group ? (
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={state.activeTab}
-            initial={{ opacity: 0, x: 28 * dir }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -28 * dir }}
-            transition={SPRING}
-            style={{ willChange: 'transform' }}
-          >
-            {state.activeTab === 'members' ? (
-              <MembersView group={group} />
-            ) : state.activeTab === 'mine' ? (
-              <MineView group={group} />
-            ) : (
-              <OverviewView group={group} />
-            )}
-          </motion.div>
-        </AnimatePresence>
+        <div className="page-viewport">
+          <AnimatePresence mode="popLayout" initial={false} custom={dir}>
+            <motion.div
+              key={state.activeTab}
+              className="page-slide"
+              custom={dir}
+              variants={pageVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={PAGE_SPRING}
+              style={{ willChange: 'transform' }}
+            >
+              {state.activeTab === 'members' ? (
+                <MembersView group={group} />
+              ) : state.activeTab === 'mine' ? (
+                <MineView group={group} />
+              ) : (
+                <OverviewView group={group} />
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
       ) : (
         <EmptyWorkspace />
       )}
