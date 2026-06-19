@@ -2188,7 +2188,6 @@ button.list-item.active {
   }
 
   .overview-heading,
-  .holding-card-head,
   .member-overview-head {
     grid-template-columns: 1fr;
   }
