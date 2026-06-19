@@ -7,7 +7,10 @@
     "icons": "node scripts/generate-icons.mjs",
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "test": "node test/run-api-tests.js"
+    "test": "node test/run-api-tests.js",
+    "web:install": "npm --prefix web install",
+    "web:dev": "npm --prefix web run dev",
+    "web:build": "npm --prefix web run build"
   },
   "engines": {
     "node": ">=20"
