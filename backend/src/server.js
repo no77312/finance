@@ -25,6 +25,7 @@ import {
 import { generateGroupAdvice } from "./groupAdvice.js";
 import { parseScreenshotImport } from "./importParser.js";
 import { refreshHoldingsWithPreviousClose } from "./marketData.js";
+import { buildDailyDigest, handleTelegramUpdate, parseChatMap, persistDailyValuations, sendTelegramMessage } from "./telegramDigest.js";
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 const defaultPublicDir = resolve(moduleDir, "..", "public");
@@ -118,6 +119,8 @@ async function routeRequest(request, response, store, context) {
         "DELETE /api/groups/:groupID/membership",
         "POST /api/imports/parse-screenshot",
         "POST /api/admin/prices/refresh",
+        "POST /api/admin/telegram/digest",
+        "POST /api/telegram/webhook",
         "POST /api/groups/:groupID/prices/refresh",
         "GET /api/groups/:groupID/advice",
         "GET /api/groups/:groupID/holding-events",
@@ -182,6 +185,66 @@ async function routeRequest(request, response, store, context) {
     });
 
     return send(response, 200, result);
+  }
+
+  if (parts[1] === "admin" && request.method === "POST" && parts.length === 4 && parts[2] === "telegram" && parts[3] === "digest") {
+    requirePriceRefreshToken(request);
+
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    if (!botToken) {
+      throw forbidden("TELEGRAM_NOT_CONFIGURED", "Set TELEGRAM_BOT_TOKEN to enable the Telegram digest.");
+    }
+
+    const chatMap = telegramChatMap();
+
+    // 先在 store 锁内算好今日快照并落库，网络推送放到锁外执行。
+    const digest = await store.update((data) => {
+      const built = buildDailyDigest({
+        groups: data.groups,
+        holdings: data.holdings,
+        dailyValuations: data.dailyValuations ?? [],
+        date: dayKey(),
+        chatMap
+      });
+      persistDailyValuations(data, built.snapshots);
+      return built;
+    });
+
+    const sentGroups = [];
+    const failed = [];
+    for (const message of digest.messages) {
+      try {
+        await sendTelegramMessage({ botToken, chatID: message.chatID, text: message.text });
+        sentGroups.push(message.groupID);
+      } catch (error) {
+        failed.push({ groupID: message.groupID, message: error.message });
+      }
+    }
+
+    return send(response, 200, {
+      date: digest.date,
+      snapshotCount: digest.snapshots.length,
+      targetGroupCount: digest.messages.length,
+      sentGroups,
+      failed
+    });
+  }
+
+  if (parts[1] === "telegram" && parts[2] === "webhook" && request.method === "POST" && parts.length === 3) {
+    requireTelegramWebhookSecret(request);
+    const body = await readJsonBody(request);
+    const outcome = await store.update((data) => handleTelegramUpdate(data, body));
+
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    if (outcome.reply && botToken) {
+      try {
+        await sendTelegramMessage({ botToken, chatID: outcome.reply.chatID, text: outcome.reply.text });
+      } catch {
+        // 回复失败不影响绑定结果，仍向 Telegram 返回 200 避免重试风暴。
+      }
+    }
+
+    return send(response, 200, { ok: true });
   }
 
   if (parts[1] !== "groups") {
@@ -694,6 +757,22 @@ function requireSessionForUser(data, memberID, request) {
   const providedToken = request.headers["x-session-token"];
   if (!userSessions.some((session) => session.token === providedToken)) {
     throw forbidden("SESSION_REQUIRED", "Valid session token is required.");
+  }
+}
+
+function telegramChatMap() {
+  // 群组与 Telegram chat 的绑定主要存在 group.telegramChatID（由 /bind 命令写入）。
+  // TELEGRAM_CHAT_MAP 仅作为管理员级别的可选兜底/覆盖。
+  return parseChatMap(process.env.TELEGRAM_CHAT_MAP);
+}
+
+function requireTelegramWebhookSecret(request) {
+  const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  if (!expectedSecret) {
+    throw forbidden("TELEGRAM_WEBHOOK_NOT_CONFIGURED", "Set TELEGRAM_WEBHOOK_SECRET to enable the Telegram webhook.");
+  }
+  if (request.headers["x-telegram-bot-api-secret-token"] !== expectedSecret) {
+    throw forbidden("TELEGRAM_WEBHOOK_FORBIDDEN", "Invalid Telegram webhook secret token.");
   }
 }
 

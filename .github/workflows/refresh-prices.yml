@@ -24,3 +24,14 @@ jobs:
             -H "Authorization: Bearer $PRICE_REFRESH_TOKEN" \
             -H "Content-Type: application/json" \
             -d "{}"
+
+      - name: Push Telegram digest
+        env:
+          API_URL: ${{ vars.POSITION_CIRCLE_API_URL || 'https://position-circle-api.onrender.com' }}
+          PRICE_REFRESH_TOKEN: ${{ secrets.PRICE_REFRESH_TOKEN }}
+        run: |
+          # 收盘价刷新后再推每日盈亏日报。后端未配置 TELEGRAM_BOT_TOKEN 时返回 403，这里容忍失败不影响整个工作流。
+          curl -fsS -X POST "$API_URL/api/admin/telegram/digest" \
+            -H "Authorization: Bearer $PRICE_REFRESH_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{}" || echo "Telegram digest skipped (TELEGRAM_BOT_TOKEN not configured?)"

@@ -48,6 +48,7 @@ function normalizeStoreData(data) {
   data.holdingEvents ??= [];
   data.portfolioSnapshots ??= buildLegacyPortfolioSnapshots(data.holdings);
   data.groupAdvice ??= [];
+  data.dailyValuations ??= [];
   return data;
 }
 
