@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { useStore } from '../store/StoreContext.jsx'
+import { useStore } from '../store/useStore.js'
 import Sheet, { SheetHeader } from './Sheet.jsx'
 import { isCurrentUserGroupOwner } from '../utils/insights.js'
 

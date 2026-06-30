@@ -1,9 +1,9 @@
 import { motion } from 'framer-motion'
-import { useStore } from '../store/StoreContext.jsx'
+import { useStore } from '../store/useStore.js'
 import { Avatar } from '../components/Avatar.jsx'
 import Icon from '../components/Icon.jsx'
 import PortfolioSection from '../components/PortfolioSection.jsx'
-import { money, formatPercent } from '../utils/format.js'
+import { money } from '../utils/format.js'
 import { buildPortfolioInsights } from '../utils/insights.js'
 
 export default function MembersView({ group }) {
@@ -20,11 +20,7 @@ export default function MembersView({ group }) {
     <main className="content single member-layout">
       <motion.button
         className="panel member-selector-button"
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ type: 'spring', stiffness: 340, damping: 30 }}
         whileTap={{ scale: 0.98 }}
-        whileHover={{ y: -2 }}
         onClick={() => actions.patch({ sheet: 'member-select' })}
       >
         <span className="member-selector-id">

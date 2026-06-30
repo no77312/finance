@@ -1,7 +1,6 @@
-import { createContext, useContext, useCallback, useMemo, useReducer, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react'
 import { api, loadSession, saveSession, removeSession } from '../api/client.js'
-
-const StoreContext = createContext(null)
+import { StoreContext } from './context.js'
 
 const initialState = {
   config: null,
@@ -20,6 +19,7 @@ const initialState = {
   adviceByGroupID: {},
   adviceLoadingGroupID: '',
   adviceError: '',
+  confirm: null,
   message: '',
   error: '',
   busy: false,
@@ -35,11 +35,6 @@ function reducer(state, action) {
     default:
       return state
   }
-}
-
-export function activeGroupFor(state) {
-  const groups = state.data?.groups ?? []
-  return groups.find((group) => group.id === state.activeGroupID) ?? groups[0] ?? null
 }
 
 function normalizeBootstrap(state, data) {
@@ -60,8 +55,12 @@ function normalizeBootstrap(state, data) {
 export function StoreProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState)
   const stateRef = useRef(state)
-  stateRef.current = state
   const noticeTimer = useRef(0)
+  const confirmAction = useRef(null)
+
+  useEffect(() => {
+    stateRef.current = state
+  }, [state])
 
   const patch = useCallback((payload) => dispatch({ type: 'patch', payload }), [])
 
@@ -101,7 +100,25 @@ export function StoreProvider({ children }) {
     [patch, setNotice],
   )
 
-  const refreshBootstrap = useCallback(async () => {
+  const requestConfirm = useCallback(
+    (options, onConfirm) => {
+      confirmAction.current = onConfirm
+      patch({ confirm: options })
+    },
+    [patch],
+  )
+
+  const resolveConfirm = useCallback(
+    (confirmed) => {
+      const action = confirmAction.current
+      confirmAction.current = null
+      patch({ confirm: null })
+      if (confirmed && action) action()
+    },
+    [patch],
+  )
+
+  const refreshBootstrap = useCallback(async ({ resetAdvice = true } = {}) => {
     const data = await callApi('/api/bootstrap')
     const current = stateRef.current
     const normalized = normalizeBootstrap(current, data)
@@ -112,7 +129,7 @@ export function StoreProvider({ children }) {
     patch({
       data: normalized,
       session,
-      adviceByGroupID: {},
+      ...(resetAdvice ? { adviceByGroupID: {} } : {}),
       activeGroupID: stillThere ? current.activeGroupID : groups[0]?.id ?? '',
     })
   }, [callApi, patch])
@@ -209,28 +226,44 @@ export function StoreProvider({ children }) {
 
   const leaveGroup = useCallback(
     (groupID) => {
-      if (!window.confirm('确定退出该群组？你在该群组的持仓将被移除。')) return
-      return runBusy(async () => {
-        await callApi(`/api/groups/${groupID}/membership`, { method: 'DELETE' })
-        await refreshBootstrap()
-        patch({ sheet: '', manageGroupID: '', selectedMemberID: '' })
-        setNotice('success', '已退出群组')
-      })
+      requestConfirm(
+        {
+          title: '退出群组？',
+          message: '你在该群组的持仓会被移除，其他群组不受影响。',
+          confirmLabel: '退出群组',
+          tone: 'danger',
+        },
+        () =>
+          runBusy(async () => {
+            await callApi(`/api/groups/${groupID}/membership`, { method: 'DELETE' })
+            await refreshBootstrap()
+            patch({ sheet: '', manageGroupID: '', selectedMemberID: '' })
+            setNotice('success', '已退出群组')
+          }),
+      )
     },
-    [runBusy, callApi, refreshBootstrap, patch, setNotice],
+    [requestConfirm, runBusy, callApi, refreshBootstrap, patch, setNotice],
   )
 
   const deleteGroup = useCallback(
     (groupID) => {
-      if (!window.confirm('确定解散该群组？所有成员的数据将被删除。')) return
-      return runBusy(async () => {
-        await callApi(`/api/groups/${groupID}`, { method: 'DELETE' })
-        await refreshBootstrap()
-        patch({ sheet: '', manageGroupID: '', selectedMemberID: '' })
-        setNotice('success', '群组已解散')
-      })
+      requestConfirm(
+        {
+          title: '解散群组？',
+          message: '群组内所有成员和持仓数据都会被删除，这个操作不可撤销。',
+          confirmLabel: '解散群组',
+          tone: 'danger',
+        },
+        () =>
+          runBusy(async () => {
+            await callApi(`/api/groups/${groupID}`, { method: 'DELETE' })
+            await refreshBootstrap()
+            patch({ sheet: '', manageGroupID: '', selectedMemberID: '' })
+            setNotice('success', '群组已解散')
+          }),
+      )
     },
-    [runBusy, callApi, refreshBootstrap, patch, setNotice],
+    [requestConfirm, runBusy, callApi, refreshBootstrap, patch, setNotice],
   )
 
   // ---- 持仓 ----
@@ -250,14 +283,22 @@ export function StoreProvider({ children }) {
 
   const deleteHolding = useCallback(
     (groupID, holdingID) => {
-      if (!window.confirm('确定删除该持仓？')) return
-      return runBusy(async () => {
-        await callApi(`/api/groups/${groupID}/holdings/${holdingID}`, { method: 'DELETE' })
-        await refreshBootstrap()
-        setNotice('success', '持仓已删除')
-      })
+      requestConfirm(
+        {
+          title: '删除持仓？',
+          message: '这条持仓会从当前组合中移除，删除后会记录在变动历史里。',
+          confirmLabel: '删除',
+          tone: 'danger',
+        },
+        () =>
+          runBusy(async () => {
+            await callApi(`/api/groups/${groupID}/holdings/${holdingID}`, { method: 'DELETE' })
+            await refreshBootstrap()
+            setNotice('success', '持仓已删除')
+          }),
+      )
     },
-    [runBusy, callApi, refreshBootstrap, setNotice],
+    [requestConfirm, runBusy, callApi, refreshBootstrap, setNotice],
   )
 
   const importDrafts = useCallback(
@@ -348,6 +389,8 @@ export function StoreProvider({ children }) {
       setNotice,
       clearNotice,
       runBusy,
+      requestConfirm,
+      resolveConfirm,
       refreshBootstrap,
       clearSession,
       signInWithGoogle,
@@ -364,7 +407,7 @@ export function StoreProvider({ children }) {
       updateProfile,
     }),
     [
-      patch, getState, callApi, setNotice, clearNotice, runBusy, refreshBootstrap, clearSession,
+      patch, getState, callApi, setNotice, clearNotice, runBusy, requestConfirm, resolveConfirm, refreshBootstrap, clearSession,
       signInWithGoogle, signInWithDevice, createGroup, joinGroup, leaveGroup, deleteGroup, saveHolding,
       deleteHolding, importDrafts, loadGroupAdvice, copyInviteCode, updateProfile,
     ],
@@ -372,10 +415,4 @@ export function StoreProvider({ children }) {
 
   const value = useMemo(() => ({ state, actions }), [state, actions])
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
-}
-
-export function useStore() {
-  const ctx = useContext(StoreContext)
-  if (!ctx) throw new Error('useStore must be used within StoreProvider')
-  return ctx
 }

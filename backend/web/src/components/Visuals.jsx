@@ -34,12 +34,12 @@ export function CompactProgress({ value = 0 }) {
 }
 
 // 权重条
-export function WeightBar({ value = 0 }) {
+export function WeightBar({ value = 0, tone = 0 }) {
   const pct = Math.max(0, Math.min(100, value * 100))
   return (
     <div className="weight-bar">
       <motion.div
-        className="weight-fill"
+        className={`weight-fill tone-${tone % 6}`}
         initial={{ width: 0 }}
         animate={{ width: `${pct}%` }}
         transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
@@ -67,16 +67,26 @@ const DONUT_COLORS = ['#0a84ff', '#5ac8fa', '#34c759', '#ff9f0a', '#ff375f', '#b
 export function DonutChart({ slices = [], size = 116, thickness = 16, centerLabel, centerValue }) {
   const radius = (size - thickness) / 2
   const circumference = 2 * Math.PI * radius
-  let offset = 0
   const total = slices.reduce((s, x) => s + (x.weight ?? 0), 0)
   const segments = slices
     .filter((s) => (s.weight ?? 0) > 0)
-    .map((slice, i) => {
+    .reduce((acc, slice, i) => {
       const fraction = total > 0 ? (slice.weight ?? 0) / total : 0
-      const seg = { ...slice, fraction, dash: fraction * circumference, offset }
-      offset += fraction * circumference
-      return { ...seg, color: DONUT_COLORS[i % DONUT_COLORS.length] }
-    })
+      const dash = fraction * circumference
+      return {
+        offset: acc.offset + dash,
+        items: [
+          ...acc.items,
+          {
+            ...slice,
+            fraction,
+            dash,
+            offset: acc.offset,
+            color: DONUT_COLORS[i % DONUT_COLORS.length],
+          },
+        ],
+      }
+    }, { offset: 0, items: [] }).items
 
   return (
     <div className="donut-chart" style={{ width: size, height: size }}>
@@ -110,5 +120,3 @@ export function DonutChart({ slices = [], size = 116, thickness = 16, centerLabe
     </div>
   )
 }
-
-export { DONUT_COLORS }

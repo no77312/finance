@@ -124,9 +124,11 @@ function snapshotPortfolioContext(snapshot, currentMemberID) {
       assetName: holding.assetName,
       marketValue: 0,
       weight: 0,
+      quantity: 0,
     }
     row.marketValue += marketValue
     row.weight += weight
+    row.quantity += Number(holding.quantity) || 0
     rowsBySymbol.set(holding.symbol, row)
   }
 
@@ -139,7 +141,8 @@ function previousSnapshotFor(data, snapshot) {
   return index > 0 ? snapshots[index - 1] : null
 }
 
-const STATUS_LABELS = { new: '新进', removed: '移除', up: '加仓', down: '减仓' }
+const STATUS_LABELS = { new: '新进', removed: '移除', up: '加仓', down: '减仓', weight: '占比变化' }
+const QUANTITY_EPSILON = 0.000001
 
 function snapshotChangeRows(currentContext, previousContext) {
   const currentRows = new Map(currentContext.rows.map((r) => [r.symbol, r]))
@@ -153,10 +156,24 @@ function snapshotChangeRows(currentContext, previousContext) {
     const beforeWeight = previous?.weight ?? 0
     const afterWeight = current?.weight ?? 0
     const delta = afterWeight - beforeWeight
-    if (Math.abs(delta) < 0.001) continue
+    const beforeQuantity = previous?.quantity ?? 0
+    const afterQuantity = current?.quantity ?? 0
+    const quantityDelta = afterQuantity - beforeQuantity
 
     const status =
-      beforeWeight === 0 ? 'new' : afterWeight === 0 ? 'removed' : delta > 0 ? 'up' : 'down'
+      beforeQuantity <= QUANTITY_EPSILON && afterQuantity > QUANTITY_EPSILON
+        ? 'new'
+        : beforeQuantity > QUANTITY_EPSILON && afterQuantity <= QUANTITY_EPSILON
+          ? 'removed'
+          : quantityDelta > QUANTITY_EPSILON
+            ? 'up'
+            : quantityDelta < -QUANTITY_EPSILON
+              ? 'down'
+              : Math.abs(delta) >= 0.001
+                ? 'weight'
+                : ''
+
+    if (!status) continue
 
     changes.push({
       symbol,
@@ -164,6 +181,9 @@ function snapshotChangeRows(currentContext, previousContext) {
       beforeWeight,
       afterWeight,
       delta,
+      beforeQuantity,
+      afterQuantity,
+      quantityDelta,
       status,
       statusLabel: STATUS_LABELS[status] ?? '调整',
     })
@@ -189,6 +209,7 @@ function snapshotSummaryChips(counts) {
   if (counts.up) chips.push({ label: `加仓 ${counts.up}`, tone: 'positive' })
   if (counts.down) chips.push({ label: `减仓 ${counts.down}`, tone: 'negative' })
   if (counts.removed) chips.push({ label: `移除 ${counts.removed}`, tone: 'negative' })
+  if (counts.weight) chips.push({ label: `占比变化 ${counts.weight}`, tone: '' })
   return chips
 }
 
@@ -212,6 +233,9 @@ function snapshotSummary(data, snapshot, members, currentMemberID) {
         beforeWeight: 0,
         afterWeight: row.weight,
         delta: row.weight,
+        beforeQuantity: 0,
+        afterQuantity: row.quantity,
+        quantityDelta: row.quantity,
         status: 'new',
         statusLabel: '首次出现',
       })),
@@ -221,6 +245,9 @@ function snapshotSummary(data, snapshot, members, currentMemberID) {
             beforeWeight: 0,
             afterWeight: currentRows[0].weight,
             delta: currentRows[0].weight,
+            beforeQuantity: 0,
+            afterQuantity: currentRows[0].quantity,
+            quantityDelta: currentRows[0].quantity,
             status: 'new',
             statusLabel: '首次出现',
           }

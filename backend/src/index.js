@@ -1,17 +1,16 @@
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { loadRuntimeConfig } from "./config.js";
 import { FileStore } from "./store.js";
 import { createPositionCircleServer } from "./server.js";
 
-const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
-const port = Number(process.env.PORT ?? 8787);
-const dataFile = process.env.DATA_FILE ?? join(rootDir, "data", "store.json");
-const seedFile = process.env.SEED_FILE ?? join(rootDir, "data", "seed.json");
+const config = loadRuntimeConfig();
 
-const store = new FileStore({ dataFile, seedFile });
-const server = createPositionCircleServer({ store });
+const store = new FileStore({
+  dataFile: config.dataFile,
+  seedFile: config.seedFile
+});
+const server = createPositionCircleServer({ store, config });
 
-server.listen(port, () => {
-  console.log(`PositionCircle API running at http://localhost:${port}`);
-  console.log(`Data file: ${dataFile}`);
+server.listen(config.port, () => {
+  console.log(`PositionCircle API running at http://localhost:${config.port}`);
+  console.log(`Data file: ${config.dataFile}`);
 });

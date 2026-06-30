@@ -1,26 +1,38 @@
+import { useEffect } from 'react'
 import { motion } from 'framer-motion'
 import Icon from '../components/Icon.jsx'
 
 // 通用底部 sheet 容器：遮罩淡入 + 面板弹簧上滑，支持退场
 export default function Sheet({ children, onClose, compact }) {
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') onClose?.()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
+
   return (
     <motion.div
       className="sheet"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.2 }}
+      transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose?.()
       }}
     >
       <motion.section
         className={`sheet-panel ${compact ? 'compact-sheet-panel' : ''}`}
-        initial={{ y: 40, scale: 0.97, opacity: 0 }}
+        role="dialog"
+        aria-modal="true"
+        initial={{ y: 28, scale: 0.985, opacity: 0 }}
         animate={{ y: 0, scale: 1, opacity: 1 }}
-        exit={{ y: 40, scale: 0.98, opacity: 0 }}
-        transition={{ type: 'spring', stiffness: 320, damping: 32 }}
+        exit={{ y: 24, scale: 0.99, opacity: 0 }}
+        transition={{ type: 'spring', stiffness: 380, damping: 34, mass: 0.86 }}
       >
+        <span className="sheet-grabber" aria-hidden="true" />
         {children}
       </motion.section>
     </motion.div>
