@@ -24,6 +24,12 @@ services:
         sync: false
       - key: PRICE_REFRESH_TOKEN
         sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        sync: false
+      - key: TELEGRAM_CHAT_MAP
+        sync: false
     disk:
       name: position-circle-data
       mountPath: /var/data

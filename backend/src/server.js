@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
-import { requirePriceRefreshToken, verifyGoogleCredential } from "./auth.js";
+import { requirePriceRefreshToken, requireTelegramWebhookSecret, verifyGoogleCredential } from "./auth.js";
 import { loadRuntimeConfig } from "./config.js";
 import {
   badRequest,
@@ -24,6 +24,7 @@ import { readJsonBody, send, sendError } from "./http.js";
 import { parseScreenshotImport } from "./importParser.js";
 import { refreshHoldingsWithPreviousClose } from "./marketData.js";
 import { serveStaticAsset } from "./staticAssets.js";
+import { buildDailyDigest, handleTelegramUpdate, parseChatMap, persistDailyValuations, sendTelegramMessage } from "./telegramDigest.js";
 
 export function createPositionCircleServer(options) {
   const config = options.config ?? loadRuntimeConfig();
@@ -121,6 +122,8 @@ async function routeRequest(request, response, store, context) {
         "DELETE /api/groups/:groupID/membership",
         "POST /api/imports/parse-screenshot",
         "POST /api/admin/prices/refresh",
+        "POST /api/admin/telegram/digest",
+        "POST /api/telegram/webhook",
         "POST /api/groups/:groupID/prices/refresh",
         "GET /api/groups/:groupID/advice",
         "GET /api/groups/:groupID/holding-events",
@@ -185,6 +188,66 @@ async function routeRequest(request, response, store, context) {
     });
 
     return send(response, 200, result);
+  }
+
+  if (parts[1] === "admin" && request.method === "POST" && parts.length === 4 && parts[2] === "telegram" && parts[3] === "digest") {
+    requirePriceRefreshToken(request, context.config);
+
+    const botToken = context.config.telegramBotToken;
+    if (!botToken) {
+      throw forbidden("TELEGRAM_NOT_CONFIGURED", "Set TELEGRAM_BOT_TOKEN to enable the Telegram digest.");
+    }
+
+    const chatMap = parseChatMap(context.config.telegramChatMap);
+
+    // 先在 store 锁内算好今日快照并落库，网络推送放到锁外执行。
+    const digest = await store.update((data) => {
+      const built = buildDailyDigest({
+        groups: data.groups,
+        holdings: data.holdings,
+        dailyValuations: data.dailyValuations ?? [],
+        date: dayKey(new Date(), context.config.appTimeZone),
+        chatMap
+      });
+      persistDailyValuations(data, built.snapshots);
+      return built;
+    });
+
+    const sentGroups = [];
+    const failed = [];
+    for (const message of digest.messages) {
+      try {
+        await sendTelegramMessage({ botToken, chatID: message.chatID, text: message.text });
+        sentGroups.push(message.groupID);
+      } catch (error) {
+        failed.push({ groupID: message.groupID, message: error.message });
+      }
+    }
+
+    return send(response, 200, {
+      date: digest.date,
+      snapshotCount: digest.snapshots.length,
+      targetGroupCount: digest.messages.length,
+      sentGroups,
+      failed
+    });
+  }
+
+  if (parts[1] === "telegram" && parts[2] === "webhook" && request.method === "POST" && parts.length === 3) {
+    requireTelegramWebhookSecret(request, context.config);
+    const body = await readJsonBody(request);
+    const outcome = await store.update((data) => handleTelegramUpdate(data, body));
+
+    const botToken = context.config.telegramBotToken;
+    if (outcome.reply && botToken) {
+      try {
+        await sendTelegramMessage({ botToken, chatID: outcome.reply.chatID, text: outcome.reply.text });
+      } catch {
+        // 回复失败不影响绑定结果，仍向 Telegram 返回 200 避免重试风暴。
+      }
+    }
+
+    return send(response, 200, { ok: true });
   }
 
   if (parts[1] !== "groups") {

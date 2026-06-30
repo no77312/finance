@@ -97,6 +97,50 @@ PRICE_REFRESH_TOKEN=一段随机生成的刷新密钥
 
 支持的原型市场：美股、A 股、基金/ETF、加密货币。现金类持仓不会刷新价格。定时刷新由 `.github/workflows/refresh-prices.yml` 调用后端 `/api/admin/prices/refresh`，需要在 GitHub Actions Secrets 里配置同一个 `PRICE_REFRESH_TOKEN`。
 
+## Telegram 每日盈亏日报
+
+后端可以每天收盘后向 Telegram 群推送「每人当日盈亏」（较上一交易日、多币种折算美元）。推送由 `.github/workflows/refresh-prices.yml` 在刷新收盘价之后调用 `/api/admin/telegram/digest`，复用同一个 `PRICE_REFRESH_TOKEN`。
+
+> 说明：日报会按成员真实持仓计算，包含成员在 App 内设为「隐藏成本/仅标的」的部分，请确保这个 Telegram 群和持仓圈群组是同一批可信成员。
+
+群组与 Telegram 群的绑定不写死在环境变量里，而是各群自助完成：把机器人拉进 Telegram 群后，发送 `/bind <持仓圈邀请码>`，后端通过 webhook 自动记录该群的 `chat_id`。
+
+### 一次性服务端配置
+
+1. 在 Telegram 里找 `@BotFather`，`/newbot` 创建机器人，拿到 `TELEGRAM_BOT_TOKEN`。
+2. 自己生成一段随机字符串作为 `TELEGRAM_WEBHOOK_SECRET`（用于校验 webhook 来源）。
+3. 在 Render 环境变量里配置 `TELEGRAM_BOT_TOKEN` 和 `TELEGRAM_WEBHOOK_SECRET`。
+4. 注册 webhook（把后端地址指给 Telegram，只需做一次）：
+
+   ```bash
+   cd backend
+   TELEGRAM_BOT_TOKEN=... TELEGRAM_WEBHOOK_SECRET=... \
+     npm run telegram:set-webhook -- https://position-circle-api.onrender.com
+   ```
+
+### 每个群组自助绑定（成员侧）
+
+1. 把机器人拉进 Telegram 群。
+2. 在群里发送 `/bind 邀请码`（邀请码在持仓圈 App 的「群组」页可看到，例如 `/bind LONG-2026`）。
+3. 机器人回复「已绑定」即成功；之后每天收盘后会在这个群推送当日盈亏。发送 `/unbind` 可解绑。
+
+可选：`TELEGRAM_CHAT_MAP={"群组ID":"chat_id"}` 作为管理员级别的兜底映射，一般不需要。
+
+### 推送时机与测试
+
+推送由 `.github/workflows/refresh-prices.yml` 在刷新收盘价之后调用 `/api/admin/telegram/digest`（复用 `PRICE_REFRESH_TOKEN`）。本地手动触发一次：
+
+```bash
+curl -fsS -X POST http://127.0.0.1:8787/api/admin/telegram/digest \
+  -H "Authorization: Bearer $PRICE_REFRESH_TOKEN" -d "{}"
+```
+
+当日涨跌需要“昨天”的净值快照才能对比，因此第一次运行只生成快照、显示“明日起展示”，从第二天起开始展示当日盈亏。相关单测：
+
+```bash
+cd backend && npm run test:telegram
+```
+
 ## Render 部署
 
 项目根目录已经包含 `render.yaml`。Render Blueprint 会创建：

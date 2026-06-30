@@ -52,6 +52,16 @@ export function requirePriceRefreshToken(request, config = {}) {
   }
 }
 
+export function requireTelegramWebhookSecret(request, config = {}) {
+  const expectedSecret = config.telegramWebhookSecret ?? process.env.TELEGRAM_WEBHOOK_SECRET;
+  if (!expectedSecret) {
+    throw forbidden("TELEGRAM_WEBHOOK_NOT_CONFIGURED", "Set TELEGRAM_WEBHOOK_SECRET to enable the Telegram webhook.");
+  }
+  if (request.headers["x-telegram-bot-api-secret-token"] !== expectedSecret) {
+    throw forbidden("TELEGRAM_WEBHOOK_FORBIDDEN", "Invalid Telegram webhook secret token.");
+  }
+}
+
 function bearerToken(value) {
   if (typeof value !== "string") {
     return undefined;

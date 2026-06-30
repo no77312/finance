@@ -203,6 +203,63 @@ Authorization: Bearer 你的 PRICE_REFRESH_TOKEN
 
 刷新单个群组的最近一个交易日收盘价，同样需要 `PRICE_REFRESH_TOKEN`。主要用于调试。
 
+### POST /api/admin/telegram/digest
+
+向已绑定 Telegram 群的群组推送「每人当日盈亏」日报。用于 GitHub Actions 等定时任务，建议排在收盘价刷新之后，不由客户端手动调用。
+
+复用刷新密钥鉴权：
+
+```text
+Authorization: Bearer 你的 PRICE_REFRESH_TOKEN
+```
+
+行为：
+
+- 为每个群组的每位成员计算当日净值快照（多币种折算美元），写入 `dailyValuations`。
+- 当日盈亏 = Σ 今日数量 ×（今日价 − 上一交易日价），只统计昨天也持有的标的；当日新开仓不计涨跌。
+- 与该成员上一份（严格早于今天的）快照对比；没有对比基准时提示"明日起展示"。
+- 只向配置了 chat 绑定的群组推送，未配置的群组仍会生成快照供次日对比。
+
+群组与 Telegram chat 的绑定存在 `group.telegramChatID`，由 `/api/telegram/webhook` 的 `/bind` 命令写入；`TELEGRAM_CHAT_MAP` 仅作为可选兜底。需要的环境变量：
+
+```text
+TELEGRAM_BOT_TOKEN=BotFather 给的机器人 token
+# 可选：管理员级别的兜底映射
+TELEGRAM_CHAT_MAP={"<PositionCircle 群组ID>":"<Telegram chat_id>"}
+```
+
+响应示例：
+
+```json
+{
+  "date": "2026-06-30",
+  "snapshotCount": 3,
+  "targetGroupCount": 1,
+  "sentGroups": ["D54C3FB6-11E8-447D-A2BB-EF9505087101"],
+  "failed": []
+}
+```
+
+### POST /api/telegram/webhook
+
+接收 Telegram 推送的 update（由 Telegram 服务器调用，不是客户端调用）。校验请求头 `X-Telegram-Bot-Api-Secret-Token` 是否等于 `TELEGRAM_WEBHOOK_SECRET`，不匹配返回 403。
+
+识别群内命令：
+
+- `/bind <邀请码>`：把发送命令的 Telegram 群 `chat_id` 绑定到该邀请码对应的持仓圈群组（写入 `group.telegramChatID`）。一个 Telegram 群只保留最后一次绑定。
+- `/unbind`：解除本群的绑定。
+- `/start`、`/help`：返回使用说明。
+
+无论处理结果如何都向 Telegram 返回 `200 {"ok":true}`，回复内容通过 `sendMessage` 异步发回群里，避免 Telegram 重试。
+
+一次性注册 webhook：
+
+```bash
+cd backend
+TELEGRAM_BOT_TOKEN=... TELEGRAM_WEBHOOK_SECRET=... \
+  npm run telegram:set-webhook -- https://position-circle-api.onrender.com
+```
+
 ### GET /api/groups/:groupID/analytics
 
 返回按币种汇总、共识标的和成员汇总。

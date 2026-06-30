@@ -12,6 +12,9 @@ export function loadRuntimeConfig(env = process.env) {
     publicDir: resolve(env.PUBLIC_DIR ?? join(rootDir, "public")),
     googleClientID: env.GOOGLE_CLIENT_ID ?? "",
     priceRefreshToken: env.PRICE_REFRESH_TOKEN ?? "",
+    telegramBotToken: env.TELEGRAM_BOT_TOKEN ?? "",
+    telegramWebhookSecret: env.TELEGRAM_WEBHOOK_SECRET ?? "",
+    telegramChatMap: env.TELEGRAM_CHAT_MAP ?? "",
     appTimeZone: env.APP_TIME_ZONE || "Asia/Shanghai"
   };
 }
