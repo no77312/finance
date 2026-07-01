@@ -3202,12 +3202,15 @@ html.theme-dark {
   --ink: #f5f5f7;
   --muted: #9a9aa2;
   --line: rgba(255, 255, 255, 0.14);
-  --accent-soft: rgba(10, 132, 255, 0.20);
+  /* 石墨中性主题色（仅深色模式；浅色保持原蓝色不变） */
+  --accent: #8b95a7;
+  --accent-rgb: 139, 149, 167;
+  --accent-soft: rgba(139, 149, 167, 0.20);
+  --accent-gradient: linear-gradient(135deg, #3a4250 0%, #4b5462 55%, #5c6675 100%);
+  --accent-card-mid: #4b5462;
+  --accent-card-end: #5c6675;
   --card-bg: rgba(28, 28, 30, 0.92);
   --card-border: rgba(255, 255, 255, 0.09);
-  /* 大面积蓝色渐变卡片调暗、降饱和，深色下不刺眼 */
-  --accent-card-mid: #1a63bf;
-  --accent-card-end: #1d4f86;
   --inset-card-bg:
     radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.06), transparent 34%),
     linear-gradient(145deg, #242427 0%, #1e1e21 56%, #191919 100%);
@@ -3249,10 +3252,12 @@ html.theme-dark.sheet-open body { background: #000000; }
 .theme-dark .snapshot-feed-card::before { background: rgba(255, 255, 255, 0.06); }
 .theme-dark .snapshot-change-list { background: rgba(255, 255, 255, 0.03); }
 .theme-dark .draft-field select { background: #1c1c1e; }
-.theme-dark .group-overview-panel {
+.theme-dark .group-overview-panel,
+.theme-dark .member-selector-button {
   background:
-    radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.10), transparent 34%),
-    linear-gradient(145deg, #0b5cbf 0%, #124a8c 52%, #123a6b 100%);
-  border-color: rgba(255, 255, 255, 0.14);
+    radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.08), transparent 34%),
+    linear-gradient(145deg, #363d49 0%, #2c323c 52%, #262a33 100%);
+  border-color: rgba(255, 255, 255, 0.12);
 }
-.theme-dark .group-overview-panel .invite-button { background: rgba(255, 255, 255, 0.24); }
+.theme-dark .group-overview-panel .invite-button { background: rgba(255, 255, 255, 0.22); }
+.theme-dark .sheet { background: rgba(0, 0, 0, 0.6); }
