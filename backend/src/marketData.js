@@ -53,7 +53,10 @@ async function fetchPreviousClose(holding) {
     return null;
   }
 
-  const provider = process.env.MARKET_DATA_PROVIDER || (process.env.ALPHA_VANTAGE_API_KEY ? "alpha_vantage" : "disabled");
+  // 默认走 Yahoo：无需 API key、无硬额度，能覆盖美股/港股/A股/基金/加密全部标的。
+  // Alpha Vantage 免费版每分钟 5 次、每天 25 次，标的一多就会全部限流失败，导致当日涨跌全是 0。
+  // 如需仍用 Alpha Vantage，可设 MARKET_DATA_PROVIDER=alpha_vantage 或 alpha_vantage_with_yahoo_fallback。
+  const provider = process.env.MARKET_DATA_PROVIDER || "yahoo";
 
   if (provider === "alpha_vantage" || provider === "alpha_vantage_with_yahoo_fallback") {
     const alphaQuote = await fetchAlphaVantageDailyClose(holding);

@@ -88,12 +88,15 @@ OPENAI_MODEL=gpt-4.1-mini
 
 ## 收盘价刷新配置
 
-后端默认使用 Alpha Vantage 官方日线接口；未配置 Key 时，不会覆盖已有价格。
+后端默认使用 **Yahoo** 日线接口：无需 API key、无硬额度，能覆盖美股/港股/A股/基金/加密全部标的。
 
 ```text
-ALPHA_VANTAGE_API_KEY=你的 Alpha Vantage API Key
 PRICE_REFRESH_TOKEN=一段随机生成的刷新密钥
+# 行情源，默认 yahoo，可选 alpha_vantage / alpha_vantage_with_yahoo_fallback
+MARKET_DATA_PROVIDER=yahoo
 ```
+
+> 注意：Alpha Vantage 免费版限制为每分钟 5 次、每天 25 次，标的一多就会全部限流失败，导致每日盈亏当日涨跌全是 0。如需使用 Alpha Vantage，设 `MARKET_DATA_PROVIDER=alpha_vantage` 或 `alpha_vantage_with_yahoo_fallback`（先 AV 后 Yahoo 兜底），并配置 `ALPHA_VANTAGE_API_KEY`。
 
 支持的原型市场：美股、A 股、基金/ETF、加密货币。现金类持仓不会刷新价格。定时刷新由 `.github/workflows/refresh-prices.yml` 调用后端 `/api/admin/prices/refresh`，需要在 GitHub Actions Secrets 里配置同一个 `PRICE_REFRESH_TOKEN`。
 
