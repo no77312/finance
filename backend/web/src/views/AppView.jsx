@@ -1,7 +1,8 @@
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store/useStore.js'
 import { activeGroupFor } from '../store/selectors.js'
+import { haptic } from '../utils/haptics.js'
 import Icon from '../components/Icon.jsx'
 import OverviewView from './OverviewView.jsx'
 import MembersView from './MembersView.jsx'
@@ -17,15 +18,23 @@ const TABS = [
 const TAB_INDEX = { overview: 0, members: 1, mine: 2 }
 
 const SPRING = { type: 'spring', stiffness: 430, damping: 38, mass: 0.72 }
-const PAGE_TRANSITION = { duration: 0.12, ease: [0.16, 1, 0.3, 1] }
+const PAGE_TRANSITION = { duration: 0.22, ease: [0.16, 1, 0.3, 1] }
 
 export default function AppView() {
   const { state } = useStore()
   const group = activeGroupFor(state)
   const shellRef = useRef(null)
+  const activeIndex = TAB_INDEX[state.activeTab] ?? 0
+  // 切 tab 时推导滑动方向（React 官方支持的"渲染期派生 state"）。
+  const [prevTab, setPrevTab] = useState({ index: activeIndex, direction: 1 })
+  let direction = prevTab.direction
+  if (prevTab.index !== activeIndex) {
+    direction = activeIndex > prevTab.index ? 1 : -1
+    setPrevTab({ index: activeIndex, direction })
+  }
 
   useEffect(() => {
-    shellRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+    shellRef.current?.scrollTo({ top: 0, behavior: 'auto' })
   }, [state.activeTab, state.activeGroupID])
 
   return (
@@ -39,9 +48,9 @@ export default function AppView() {
               <motion.div
                 key={state.activeTab}
                 className="page-slide"
-                initial={{ opacity: 0, y: 2 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -2, position: 'absolute' }}
+                initial={{ opacity: 0, x: 20 * direction }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 * direction, position: 'absolute' }}
                 transition={PAGE_TRANSITION}
               >
                 {state.activeTab === 'members' ? (
@@ -119,7 +128,10 @@ function Tabbar() {
           <button
             key={tab.value}
             className={`tabbar-item ${active ? 'active' : ''}`}
-            onClick={() => actions.patch({ activeTab: tab.value, sheet: '' })}
+            onClick={() => {
+              if (!active) haptic(8)
+              actions.patch({ activeTab: tab.value, sheet: '' })
+            }}
             aria-label={tab.label}
             aria-current={active ? 'page' : undefined}
           >

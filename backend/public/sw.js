@@ -1,4 +1,4 @@
-const CACHE_NAME = "position-circle-shell-v4";
+const CACHE_NAME = "position-circle-shell-v5";
 const SHELL_ASSETS = [
   "/",
   "/styles.css",
@@ -31,6 +31,21 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // 指纹哈希资源（/assets/index-*.js 等）内容不可变：cache-first，命中即用、无需再走网络。
+  if (url.pathname.startsWith("/assets/")) {
+    event.respondWith(
+      caches.match(event.request).then((cached) =>
+        cached || fetch(event.request).then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          return response;
+        })
+      )
+    );
+    return;
+  }
+
+  // 文档 / styles.css / manifest / icons：network-first，离线回退缓存。
   event.respondWith(
     fetch(event.request)
       .then((response) => {

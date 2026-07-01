@@ -68,6 +68,7 @@ const ICONS = {
     </>
   ),
   chevron: <path d="m9 6 6 6-6 6" />,
+  check: <path d="m5 12.5 4.4 4.4L19 7.2" />,
   close: (
     <>
       <path d="M6 6l12 12" />

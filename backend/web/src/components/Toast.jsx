@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useStore } from '../store/useStore.js'
+import Icon from './Icon.jsx'
 
 // 顶部 toast，带进出场动画
 export default function Toast() {
@@ -8,7 +9,7 @@ export default function Toast() {
   const isError = Boolean(state.error)
 
   return (
-    <div className="toast-layer">
+    <div className="toast-layer" role="status" aria-live={isError ? 'assertive' : 'polite'}>
       <AnimatePresence>
         {text && (
           <motion.div
@@ -19,7 +20,10 @@ export default function Toast() {
             exit={{ y: -16, opacity: 0, scale: 0.98 }}
             transition={{ type: 'spring', stiffness: 420, damping: 32 }}
           >
-            {text}
+            <span className="toast-icon" aria-hidden="true">
+              <Icon name={isError ? 'close' : 'check'} size={15} />
+            </span>
+            <span>{text}</span>
           </motion.div>
         )}
       </AnimatePresence>

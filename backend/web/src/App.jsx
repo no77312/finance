@@ -91,21 +91,20 @@ function Root() {
     }
   }, [state.session, state.booting, actions])
 
-  // 同步 sheet-open class 与 theme-color
+  // 同步 sheet-open class 与 theme-color（跟随深色模式）
   useEffect(() => {
     const open = Boolean(state.sheet || state.confirm)
     document.documentElement.classList.toggle('sheet-open', open)
     const meta = document.querySelector('meta[name="theme-color"]')
-    if (meta) meta.setAttribute('content', open ? '#f5f6f8' : '#ffffff')
+    if (!meta) return
+    const dark = window.matchMedia?.('(prefers-color-scheme: dark)').matches
+    meta.setAttribute('content', open ? (dark ? '#0b0b0d' : '#f5f6f8') : (dark ? '#000000' : '#ffffff'))
   }, [state.sheet, state.confirm])
 
   if (state.booting) {
     return (
       <main className="app-shell">
-        <div className="boot">
-          <div className="brand-mark">持</div>
-          <div>正在打开持仓圈</div>
-        </div>
+        <BootSkeleton />
         <Toast />
       </main>
     )
@@ -117,6 +116,25 @@ function Root() {
       <GlobalActivityBar active={state.busy} />
       <Toast />
     </>
+  )
+}
+
+function BootSkeleton() {
+  return (
+    <div className="boot-skeleton" aria-busy="true" aria-label="正在打开持仓圈">
+      <div className="boot-skeleton-brand">
+        <div className="brand-mark">持</div>
+        <div className="sk sk-line" style={{ width: 132 }} />
+      </div>
+      <div className="sk sk-panel" />
+      <div className="boot-skeleton-kpis">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="sk sk-kpi" />
+        ))}
+      </div>
+      <div className="sk sk-card" />
+      <div className="sk sk-card" />
+    </div>
   )
 }
 
