@@ -224,14 +224,16 @@ function yahooSymbol(holding) {
   const symbol = cleanSymbol(holding.symbol);
   switch (holding.market) {
   case "hkStock":
-    return `${symbol.padStart(4, "0")}.HK`;
+    // 先去掉多余前导零再补到 4 位：00700 → 700 → 0700（Yahoo 用 0700.HK）。
+    return `${(symbol.replace(/^0+/, "") || "0").padStart(4, "0")}.HK`;
   case "cnStock":
     return `${symbol}.${symbol.startsWith("6") ? "SS" : "SZ"}`;
   case "crypto":
     return `${symbol}-${holding.currency || "USD"}`;
   case "usStock":
   case "fund":
-    return symbol;
+    // B 类股等用连字符，不用点：BRK.B → BRK-B。
+    return symbol.replace(/\./g, "-");
   default:
     return "";
   }
