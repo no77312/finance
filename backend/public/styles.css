@@ -67,9 +67,9 @@ html.sheet-open body {
   background: #f5f6f8;
 }
 
-html.sheet-open .app-shell {
-  overflow: hidden;
-}
+/* 打开 sheet 时不再切换 .app-shell 的 overflow：
+   全屏浮层已经挡住背景、拦截触摸，无需锁滚动容器；
+   在 iOS 独立 PWA 里切 overflow 会让 sticky 顶栏错位并引发重绘卡顿。 */
 
 button,
 input,
@@ -419,7 +419,6 @@ button:disabled {
 
 .page-slide {
   width: 100%;
-  will-change: transform, opacity;
 }
 
 .page-viewport > .page-slide {
@@ -702,7 +701,6 @@ button.list-item.active {
   gap: 9px;
   padding: 13px;
   border-radius: 24px;
-  will-change: transform;
 }
 
 .holding-card-head {
@@ -924,7 +922,6 @@ button.list-item.active {
 .portfolio-summary {
   gap: 10px;
   padding: 13px;
-  will-change: transform;
 }
 
 .portfolio-owner-row {
