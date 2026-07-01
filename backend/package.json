@@ -8,6 +8,7 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "test": "node test/run-api-tests.js",
+    "test:advice": "node test/group-advice-score.test.mjs",
     "test:telegram": "node test/telegram-digest.test.mjs && node test/telegram-webhook.test.mjs",
     "telegram:set-webhook": "node scripts/set-telegram-webhook.mjs",
     "web:install": "npm --prefix web install",

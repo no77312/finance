@@ -45,7 +45,7 @@ export async function generateGroupAdvice({ group, holdings, requesterID }) {
   try {
     const modelAdvice = await requestModelAdvice(profile);
     return {
-      ...normalizeAdvice(modelAdvice, fallbackAdvice(profile)),
+      ...normalizeAdvice(modelAdvice, fallbackAdvice(profile), profile),
       source: "openai"
     };
   } catch (error) {
@@ -143,16 +143,59 @@ function buildMemberProfiles(group, rows, memberByID) {
             : null
       }));
     const top = positions[0];
+
+    // 结构指标：基于全部可见持仓（不只 top 6）。
+    const weights = totalValue > 0 ? valued.map((row) => row.marketValueUSD / totalValue) : [];
+    const hhi = weights.reduce((sum, weight) => sum + weight * weight, 0); // 赫芬达尔指数
+    const effectiveHoldings = hhi > 0 ? 1 / hhi : 0;                        // 有效持仓数 = 1/HHI
+    const marketCount = new Set(valued.map((row) => row.market)).size;
+    const topWeight = weights.length ? Math.max(...weights) : 0;
+    const structural = computeStructuralHealth({
+      valuedCount: valued.length,
+      topWeight,
+      effectiveHoldings,
+      marketCount
+    });
+
     return {
       name: member.displayName,
       holdingCount: memberRows.length,
+      valuedCount: valued.length,
       totalMarketValueUSD: round(totalValue),
       totalPnlUSD: pnlUSD === null ? null : round(pnlUSD),
       totalPnlPercent: pnlUSD !== null && totalCost > 0 ? roundRatio(pnlUSD / totalCost) : null,
-      topWeight: top ? top.weight : 0,
+      topWeight: roundRatio(topWeight),
+      marketCount,
+      effectiveHoldings: Math.round(effectiveHoldings * 100) / 100,
+      structuralScore: structural.score,
+      structuralLabel: structural.label,
       positions
     };
   });
+}
+
+// 纯结构健康分：只看集中度、分散度、市场分布，与浮盈亏无关，不随每日涨跌波动。
+function computeStructuralHealth({ valuedCount, topWeight, effectiveHoldings, marketCount }) {
+  if (!valuedCount) {
+    return { score: 0, label: "数据不足" };
+  }
+  const concentration = clampRatio((topWeight - 0.2) / 0.6); // 最大仓位 <=20%→0，>=80%→1
+  const breadth = clampRatio((effectiveHoldings - 1) / 5);   // 有效持仓 1只→0，>=6只→1
+  const marketSpread = clampRatio((marketCount - 1) / 2);    // 单市场→0，>=3市场→1
+  const raw = 55 + breadth * 25 + marketSpread * 10 - concentration * 35;
+  const score = Math.max(5, Math.min(98, Math.round(raw)));
+  return { score, label: structuralLabelForScore(score) };
+}
+
+function structuralLabelForScore(score) {
+  if (score >= 80) return "分散均衡";
+  if (score >= 62) return "稳健";
+  if (score >= 42) return "略集中";
+  return "高集中";
+}
+
+function clampRatio(value) {
+  return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
 }
 
 function adviceHoldingRow(holding, requesterID, memberByID) {
@@ -239,10 +282,10 @@ async function requestModelAdvice(profile) {
                 "你是群组持仓健康度顾问，只输出符合 schema 的 JSON，全部使用中文。",
                 "headline 一句话概括整组的整体状态；summary 用2-3句概述全组的集中度、共识与风险。",
                 "members 数组必须为输入 memberProfiles 中的每一位成员各生成一项，name 与输入完全一致。",
-                "每位成员：healthLabel 用简短中文标签（如“稳健”“偏激进”“高集中”“分散均衡”“数据不足”）；healthScore 为 0-100 的整数健康分（越高越健康，集中度过高/单一市场/大幅浮亏应扣分）。",
-                "health 字段：结合该成员的持仓集中度、市场分布、盈亏(pnlPercent/totalPnlPercent)用1-2句评估其持仓健康程度。",
-                "strategy 字段：结合当前股价表现与盈亏，给出该成员下一步可考虑的调整方向(如分散集中仓位、关注浮亏标的、再平衡市场暴露等)，1-2句，措辞为“可考虑/建议关注”，不要给出明确买卖点位或荐股。",
-                "如果某成员金额被隐藏或无持仓，healthLabel 用“数据不足”，并说明可见数据有限。",
+                "健康分只反映组合结构（集中度、分散程度、市场分布），与浮盈亏无关。每位成员的 healthScore、healthLabel 后端会用确定性的结构分覆盖，你照常填写即可（可参考输入里的 structuralScore / structuralLabel），把精力放在 health 与 strategy 的文字上。",
+                "health 字段：用1-2句点评该成员的集中度与市场分布是否稳健，并客观陈述一句当前浮盈亏(pnlPercent/totalPnlPercent)，但不要用浮盈亏高低判断健康与否。",
+                "strategy 字段：结合集中度与市场分布，给出下一步可考虑的方向(如适度分散、跨市场配置、定期再平衡)，1-2句，措辞为“可考虑/建议关注”，不要给出买卖点位或荐股。",
+                "如果某成员无可见持仓或金额被隐藏，healthLabel 用“数据不足”，并说明可见数据有限。",
                 "语气克制、专业、适合手机阅读。"
               ].join("\n")
             }
@@ -306,37 +349,58 @@ function fallbackMemberAdvice(member) {
     };
   }
 
+  if (!member.valuedCount) {
+    return {
+      name: member.name,
+      healthLabel: "数据不足",
+      healthScore: 0,
+      health: `共 ${member.holdingCount} 个标的，但金额未公开，暂时无法评估结构健康度。`,
+      strategy: "可在可见范围内多分享一些持仓信息，便于群内交流。"
+    };
+  }
+
   const top = member.positions[0];
-  const concentrated = member.topWeight >= 0.4;
   const pnl = member.totalPnlPercent;
-  const healthScore = Math.max(
-    10,
-    Math.min(95, Math.round(72 - (concentrated ? 22 : 0) + (pnl ? Math.max(-20, Math.min(15, pnl * 100)) : 0)))
-  );
-  const healthLabel = concentrated ? "偏集中" : member.positions.length >= 4 ? "分散均衡" : "稳健";
   const pnlCopy = pnl === null ? "盈亏数据未公开" : pnl >= 0 ? `整体浮盈约 ${formatPercent(pnl)}` : `整体浮亏约 ${formatPercent(Math.abs(pnl))}`;
 
   return {
     name: member.name,
-    healthLabel,
-    healthScore,
-    health: `共 ${member.holdingCount} 个可见标的，最大单一仓位${top ? `（${top.symbol}）` : ""}约占 ${formatPercent(member.topWeight)}，${pnlCopy}。`,
-    strategy: concentrated
-      ? "单一标的占比偏高，可考虑分散集中仓位、关注与之相关的市场风险。"
-      : "结构相对均衡，可结合各标的盈亏与股价表现做定期再平衡。"
+    healthLabel: member.structuralLabel,
+    healthScore: member.structuralScore,
+    health: `共 ${member.valuedCount} 个可见标的、覆盖 ${member.marketCount} 个市场，最大单一仓位${top ? `（${top.symbol}）` : ""}约占 ${formatPercent(member.topWeight)}。${pnlCopy}。`,
+    strategy: strategyForStructure(member)
   };
 }
 
-function normalizeAdvice(advice, fallback) {
+function strategyForStructure(member) {
+  if (member.topWeight >= 0.5) {
+    return "单一标的占比偏高，可考虑适度分散、降低集中风险。";
+  }
+  if ((member.marketCount ?? 1) <= 1) {
+    return "集中在单一市场，可考虑跨市场配置以平滑波动。";
+  }
+  if (member.structuralScore >= 80) {
+    return "结构较为分散均衡，可定期再平衡并结合各标的复盘。";
+  }
+  return "结构尚可，可留意最大仓位占比与市场集中度的变化。";
+}
+
+function normalizeAdvice(advice, fallback, profile) {
+  const profileByName = new Map((profile?.memberProfiles ?? []).map((member) => [member.name, member]));
   const members = Array.isArray(advice.members)
     ? advice.members
-        .map((member) => ({
-          name: cleanText(member.name).slice(0, 40),
-          healthLabel: cleanText(member.healthLabel).slice(0, 12) || "观察中",
-          healthScore: clampScore(member.healthScore),
-          health: cleanText(member.health).slice(0, 200),
-          strategy: cleanText(member.strategy).slice(0, 200)
-        }))
+        .map((member) => {
+          const name = cleanText(member.name).slice(0, 40);
+          const matched = profileByName.get(name);
+          // 结构分与标签以后端确定性计算为准，模型只负责 health / strategy 文字。
+          return {
+            name,
+            healthLabel: matched ? matched.structuralLabel : (cleanText(member.healthLabel).slice(0, 12) || "观察中"),
+            healthScore: matched ? matched.structuralScore : clampScore(member.healthScore),
+            health: cleanText(member.health).slice(0, 200),
+            strategy: cleanText(member.strategy).slice(0, 200)
+          };
+        })
         .filter((member) => member.name)
     : [];
   return {
