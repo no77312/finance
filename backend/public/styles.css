@@ -3243,6 +3243,9 @@ html.theme-dark.sheet-open body { background: #000000; }
 .theme-dark .form-panel { background: rgba(28, 28, 30, 0.9); }
 .theme-dark .weight-bar,
 .theme-dark .allocation-strip { background: rgba(255, 255, 255, 0.08); }
+/* 持仓里的占比/分布进度条：亮色 tone 渐变在深色下太扎眼，统一压暗降饱和 */
+.theme-dark .weight-fill,
+.theme-dark .allocation-segment { filter: brightness(0.66) saturate(0.85); }
 .theme-dark .group-menu-action { background: #2c2c2e; }
 .theme-dark .group-menu-status { background: #1c1c1e; }
 .theme-dark .group-menu-status.active { background: #2c2c2e; }
