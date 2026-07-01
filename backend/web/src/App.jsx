@@ -6,6 +6,7 @@ import { api } from './api/client.js'
 import LoginView from './views/LoginView.jsx'
 import AppView from './views/AppView.jsx'
 import Toast from './components/Toast.jsx'
+import { resolveDark } from './utils/theme.js'
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
@@ -91,21 +92,29 @@ function Root() {
     }
   }, [state.session, state.booting, actions])
 
-  // 同步 sheet-open class 与 theme-color
+  // 同步 sheet-open class、主题类（.theme-dark）与 theme-color；跟随系统时监听系统变化。
   useEffect(() => {
     const open = Boolean(state.sheet || state.confirm)
     document.documentElement.classList.toggle('sheet-open', open)
-    const meta = document.querySelector('meta[name="theme-color"]')
-    if (meta) meta.setAttribute('content', open ? '#f5f6f8' : '#ffffff')
-  }, [state.sheet, state.confirm])
+    const mq = window.matchMedia?.('(prefers-color-scheme: dark)')
+    const apply = () => {
+      const dark = resolveDark(state.theme)
+      document.documentElement.classList.toggle('theme-dark', dark)
+      const meta = document.querySelector('meta[name="theme-color"]')
+      if (meta) meta.setAttribute('content', open ? (dark ? '#0b0b0d' : '#f5f6f8') : (dark ? '#000000' : '#ffffff'))
+    }
+    apply()
+    if (state.theme === 'system' && mq?.addEventListener) {
+      mq.addEventListener('change', apply)
+      return () => mq.removeEventListener('change', apply)
+    }
+    return undefined
+  }, [state.sheet, state.confirm, state.theme])
 
   if (state.booting) {
     return (
       <main className="app-shell">
-        <div className="boot">
-          <div className="brand-mark">持</div>
-          <div>正在打开持仓圈</div>
-        </div>
+        <BootSkeleton />
         <Toast />
       </main>
     )
@@ -117,6 +126,25 @@ function Root() {
       <GlobalActivityBar active={state.busy} />
       <Toast />
     </>
+  )
+}
+
+function BootSkeleton() {
+  return (
+    <div className="boot-skeleton" aria-busy="true" aria-label="正在打开持仓圈">
+      <div className="boot-skeleton-brand">
+        <div className="brand-mark">持</div>
+        <div className="sk sk-line" style={{ width: 132 }} />
+      </div>
+      <div className="sk sk-panel" />
+      <div className="boot-skeleton-kpis">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="sk sk-kpi" />
+        ))}
+      </div>
+      <div className="sk sk-card" />
+      <div className="sk sk-card" />
+    </div>
   )
 }
 

@@ -17,5 +17,17 @@ export default defineConfig({
   build: {
     outDir: '../public',
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        // 把 react / framer-motion 拆成独立 vendor chunk：应用代码变更不会让它们的缓存失效。
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('framer-motion') || id.includes('motion-dom') || id.includes('motion-utils')) return 'motion'
+            if (id.includes('/react') || id.includes('/scheduler')) return 'vendor'
+          }
+          return undefined
+        },
+      },
+    },
   },
 })

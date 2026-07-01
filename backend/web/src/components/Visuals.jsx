@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
 import { formatPercent } from '../utils/format.js'
+import { DONUT_COLORS } from '../utils/colors.js'
 
 // 分配条：多色分段，宽度增长动画（数据可视化动效）
 export function AllocationStrip({ slices = [], className = '' }) {
@@ -60,8 +61,6 @@ export function LegendChips({ slices = [], max = 4 }) {
     </div>
   )
 }
-
-const DONUT_COLORS = ['#0a84ff', '#5ac8fa', '#34c759', '#ff9f0a', '#ff375f', '#bf5af2']
 
 // 环形图：市场/资产分布，带描边增长动画
 export function DonutChart({ slices = [], size = 116, thickness = 16, centerLabel, centerValue }) {

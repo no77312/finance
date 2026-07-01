@@ -3,6 +3,7 @@ import { useStore } from '../store/useStore.js'
 import { Avatar } from '../components/Avatar.jsx'
 import Icon from '../components/Icon.jsx'
 import PortfolioSection from '../components/PortfolioSection.jsx'
+import AnimatedNumber from '../components/AnimatedNumber.jsx'
 import { money } from '../utils/format.js'
 import { buildPortfolioInsights } from '../utils/insights.js'
 
@@ -32,7 +33,11 @@ export default function MembersView({ group }) {
           </span>
         </span>
         <span className="member-selector-value">
-          {insights && <strong>{money(insights.totalVisibleValue)}</strong>}
+          {insights && (
+            <strong>
+              <AnimatedNumber value={insights.totalVisibleValue} format={(v) => money(v)} resetKey={selectedID} />
+            </strong>
+          )}
           {members.length > 1 && <span>共 {members.length} 人</span>}
         </span>
         <span className="member-selector-chevron">

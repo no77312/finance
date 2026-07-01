@@ -68,6 +68,21 @@ const ICONS = {
     </>
   ),
   chevron: <path d="m9 6 6 6-6 6" />,
+  check: <path d="m5 12.5 4.4 4.4L19 7.2" />,
+  // 主题：太阳 / 月亮 / 半填充圆（跟随系统）
+  sun: (
+    <>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6" />
+    </>
+  ),
+  moon: <path d="M20.5 14.8A8.2 8.2 0 0 1 9.2 3.5 7.2 7.2 0 1 0 20.5 14.8Z" />,
+  'theme-auto': (
+    <>
+      <circle cx="12" cy="12" r="8.2" />
+      <path d="M12 3.8a8.2 8.2 0 0 0 0 16.4Z" fill="currentColor" stroke="none" />
+    </>
+  ),
   close: (
     <>
       <path d="M6 6l12 12" />

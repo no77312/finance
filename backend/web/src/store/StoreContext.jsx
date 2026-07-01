@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react'
 import { api, loadSession, saveSession, removeSession } from '../api/client.js'
+import { haptic } from '../utils/haptics.js'
+import { loadTheme, saveTheme } from '../utils/theme.js'
 import { StoreContext } from './context.js'
 
 const initialState = {
@@ -24,6 +26,7 @@ const initialState = {
   error: '',
   busy: false,
   booting: true,
+  theme: loadTheme(),
 }
 
 function reducer(state, action) {
@@ -73,6 +76,7 @@ export function StoreProvider({ children }) {
 
   const setNotice = useCallback(
     (kind, text) => {
+      haptic(kind === 'error' ? [14, 40, 14] : 12)
       patch(kind === 'error' ? { error: text, message: '' } : { message: text, error: '' })
       window.clearTimeout(noticeTimer.current)
       noticeTimer.current = window.setTimeout(() => patch({ error: '', message: '' }), 2600)
@@ -124,13 +128,23 @@ export function StoreProvider({ children }) {
     const normalized = normalizeBootstrap(current, data)
     const groups = normalized.groups
     const stillThere = groups.some((g) => g.id === current.activeGroupID)
+    const nextActiveGroupID = stillThere ? current.activeGroupID : groups[0]?.id ?? ''
     const session = current.session && data.user ? { ...current.session, user: data.user } : current.session
     if (session !== current.session) saveSession(session)
+
+    // 数据无变化时保持 data 引用不变（memo 不重算），静默轮询无变化时直接跳过整个 patch。
+    const unchanged =
+      Boolean(current.data) &&
+      session === current.session &&
+      nextActiveGroupID === current.activeGroupID &&
+      JSON.stringify(normalized) === JSON.stringify(current.data)
+    if (unchanged && !resetAdvice) return
+
     patch({
-      data: normalized,
+      data: unchanged ? current.data : normalized,
       session,
       ...(resetAdvice ? { adviceByGroupID: {} } : {}),
-      activeGroupID: stillThere ? current.activeGroupID : groups[0]?.id ?? '',
+      activeGroupID: nextActiveGroupID,
     })
   }, [callApi, patch])
 
@@ -381,10 +395,20 @@ export function StoreProvider({ children }) {
     [runBusy, callApi, refreshBootstrap, patch, setNotice],
   )
 
+  const setTheme = useCallback(
+    (theme) => {
+      saveTheme(theme)
+      haptic(8)
+      patch({ theme })
+    },
+    [patch],
+  )
+
   const actions = useMemo(
     () => ({
       patch,
       getState,
+      setTheme,
       callApi,
       setNotice,
       clearNotice,
@@ -407,7 +431,7 @@ export function StoreProvider({ children }) {
       updateProfile,
     }),
     [
-      patch, getState, callApi, setNotice, clearNotice, runBusy, requestConfirm, resolveConfirm, refreshBootstrap, clearSession,
+      patch, getState, setTheme, callApi, setNotice, clearNotice, runBusy, requestConfirm, resolveConfirm, refreshBootstrap, clearSession,
       signInWithGoogle, signInWithDevice, createGroup, joinGroup, leaveGroup, deleteGroup, saveHolding,
       deleteHolding, importDrafts, loadGroupAdvice, copyInviteCode, updateProfile,
     ],

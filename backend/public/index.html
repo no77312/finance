@@ -4,6 +4,16 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#f5f6f8" />
+    <script>
+      // 首屏前应用主题，避免深色偏好用户的白闪。
+      (function () {
+        try {
+          var t = localStorage.getItem('position-circle:theme') || 'system';
+          var dark = t === 'dark' || (t === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (dark) document.documentElement.classList.add('theme-dark');
+        } catch (e) {}
+      })();
+    </script>
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -14,7 +24,10 @@
     <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/styles.css" />
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script type="module" crossorigin src="/assets/index-B-VjzJrc.js"></script>
+    <script type="module" crossorigin src="/assets/index-DcEefu5v.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/rolldown-runtime-Cyuzqnbw.js">
+    <link rel="modulepreload" crossorigin href="/assets/motion-gQkJz4kC.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-DO_dZk2F.js">
   </head>
   <body>
     <div id="root"></div>
