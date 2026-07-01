@@ -96,6 +96,10 @@ function Root() {
   useEffect(() => {
     const open = Boolean(state.sheet || state.confirm)
     document.documentElement.classList.toggle('sheet-open', open)
+    // 关闭 sheet 时主动收起键盘，避免 iOS 独立 PWA 里键盘残留导致视口/顶栏漂移。
+    if (!open && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur()
+    }
     const mq = window.matchMedia?.('(prefers-color-scheme: dark)')
     const apply = () => {
       const dark = resolveDark(state.theme)
