@@ -148,6 +148,32 @@ export async function sendTelegramMessage({ botToken, chatID, text, fetchImpl = 
   return response.json();
 }
 
+// 构建“有人提交调仓”的实时推送文案（完整变动口径：标的 + 数量 + 成本 + 现价）。
+// 一次提交可能含多笔事件（如截图同步），合并成一条消息。
+export function buildHoldingChangeMessage({ group, events, actorName }) {
+  const list = (events ?? []).filter(Boolean);
+  if (list.length === 0) {
+    return null;
+  }
+
+  const lines = [];
+  if (list.length === 1) {
+    lines.push(`📝 <b>${escapeHTML(actorName)}</b> 提交了调仓 · ${escapeHTML(group.name)}`);
+  } else {
+    const summary = [
+      countByType(list, "created") ? `新增 ${countByType(list, "created")}` : "",
+      countByType(list, "updated") ? `调整 ${countByType(list, "updated")}` : "",
+      countByType(list, "deleted") ? `清仓 ${countByType(list, "deleted")}` : ""
+    ].filter(Boolean).join("、");
+    lines.push(`📝 <b>${escapeHTML(actorName)}</b> 同步了组合（${summary}）· ${escapeHTML(group.name)}`);
+  }
+  lines.push("");
+  for (const event of list) {
+    lines.push(holdingChangeLine(event));
+  }
+  return lines.join("\n");
+}
+
 // 把今日快照合并进 data.dailyValuations，按 id 去重覆盖，每个成员-群组只保留最近 120 天。
 export function persistDailyValuations(data, snapshots) {
   data.dailyValuations ??= [];
@@ -318,7 +344,7 @@ function indexPriorValuations(dailyValuations, date) {
   return latestByOwner;
 }
 
-function resolveChatID(group, chatMap) {
+export function resolveChatID(group, chatMap) {
   const fromGroup = typeof group.telegramChatID === "string" ? group.telegramChatID.trim() : "";
   if (fromGroup) {
     return fromGroup;
@@ -365,6 +391,58 @@ function formatSignedPercent(value) {
   const percent = (Number(value) || 0) * 100;
   const sign = percent > 0 ? "+" : percent < 0 ? "−" : "";
   return `${sign}${Math.abs(percent).toFixed(2)}%`;
+}
+
+function countByType(events, type) {
+  return events.filter((event) => event.type === type).length;
+}
+
+function holdingChangeLine(event) {
+  const symbol = escapeHTML(event.symbol ?? "");
+  const name = event.assetName && event.assetName !== event.symbol ? `（${escapeHTML(event.assetName)}）` : "";
+  const cur = currencySymbol(event.currency);
+  const quantity = formatQuantity(event.quantity);
+  const price = formatMoney(event.lastPrice, cur);
+  const cost = isFiniteNumber(event.averageCost) ? formatMoney(event.averageCost, cur) : null;
+
+  if (event.type === "created") {
+    const costPart = cost ? ` · 成本 ${cost}` : "";
+    return `🟢 新增 <b>${symbol}</b>${name} · 数量 ${quantity}${costPart} · 现价 ${price}`;
+  }
+
+  if (event.type === "deleted") {
+    return `🔴 清仓 <b>${symbol}</b>${name} · 原数量 ${quantity} · 现价 ${price}`;
+  }
+
+  const parts = [];
+  if (isFiniteNumber(event.previousQuantity) && Number(event.previousQuantity) !== Number(event.quantity)) {
+    parts.push(`数量 ${formatQuantity(event.previousQuantity)} → ${quantity}`);
+  } else {
+    parts.push(`数量 ${quantity}`);
+  }
+  if (cost && isFiniteNumber(event.previousAverageCost) && Number(event.previousAverageCost) !== Number(event.averageCost)) {
+    parts.push(`成本 ${formatMoney(event.previousAverageCost, cur)} → ${cost}`);
+  }
+  parts.push(`现价 ${price}`);
+  return `🔵 调整 <b>${symbol}</b>${name} · ${parts.join(" · ")}`;
+}
+
+function currencySymbol(currency) {
+  return { USD: "$", HKD: "HK$", CNY: "¥", SGD: "S$" }[currency] ?? "";
+}
+
+function formatMoney(value, currencySym) {
+  const number = Number(value) || 0;
+  return `${currencySym}${number.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 4 })}`;
+}
+
+function formatQuantity(value) {
+  const number = Number(value) || 0;
+  return number.toLocaleString("en-US", { maximumFractionDigits: 8 });
+}
+
+function isFiniteNumber(value) {
+  return value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
 }
 
 function escapeHTML(value) {

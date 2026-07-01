@@ -260,6 +260,10 @@ TELEGRAM_BOT_TOKEN=... TELEGRAM_WEBHOOK_SECRET=... \
   npm run telegram:set-webhook -- https://position-circle-api.onrender.com
 ```
 
+### 实时调仓推送（无独立端点）
+
+持仓的创建（`POST .../holdings`）、更新（`PUT .../holdings/:id`）、删除（`DELETE .../holdings/:id`）和截图同步（`PUT .../holdings/sync`）成功后，会向该群组绑定的 Telegram 群推送一条变动消息（完整变动口径，截图同步合并成一条）。采用 fire-and-forget，不阻塞响应、失败不影响写入；需配置 `TELEGRAM_BOT_TOKEN` 且该群组已绑定 `telegramChatID`。
+
 ### GET /api/groups/:groupID/analytics
 
 返回按币种汇总、共识标的和成员汇总。
