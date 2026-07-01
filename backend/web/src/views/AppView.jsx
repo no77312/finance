@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store/useStore.js'
 import { activeGroupFor } from '../store/selectors.js'
 import { haptic } from '../utils/haptics.js'
+import { THEME_META, nextTheme } from '../utils/theme.js'
 import Icon from '../components/Icon.jsx'
 import OverviewView from './OverviewView.jsx'
 import MembersView from './MembersView.jsx'
@@ -82,6 +83,16 @@ function Topbar({ group }) {
       <header className="topbar-float">
         <div className="topbar-title">{label}</div>
         <div className="topbar-actions">
+          <motion.button
+            className="topbar-pill-button"
+            whileHover={{ y: -1 }}
+            whileTap={{ scale: 0.92 }}
+            onClick={() => actions.setTheme(nextTheme(state.theme))}
+            aria-label={`主题：${THEME_META[state.theme].label}，点击切换`}
+            title={`主题：${THEME_META[state.theme].label}`}
+          >
+            <Icon name={THEME_META[state.theme].icon} size={19} />
+          </motion.button>
           {group && (
             <motion.button
               className="topbar-pill-button"

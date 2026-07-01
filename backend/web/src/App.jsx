@@ -6,6 +6,7 @@ import { api } from './api/client.js'
 import LoginView from './views/LoginView.jsx'
 import AppView from './views/AppView.jsx'
 import Toast from './components/Toast.jsx'
+import { resolveDark } from './utils/theme.js'
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
@@ -91,15 +92,24 @@ function Root() {
     }
   }, [state.session, state.booting, actions])
 
-  // 同步 sheet-open class 与 theme-color（跟随深色模式）
+  // 同步 sheet-open class、主题类（.theme-dark）与 theme-color；跟随系统时监听系统变化。
   useEffect(() => {
     const open = Boolean(state.sheet || state.confirm)
     document.documentElement.classList.toggle('sheet-open', open)
-    const meta = document.querySelector('meta[name="theme-color"]')
-    if (!meta) return
-    const dark = window.matchMedia?.('(prefers-color-scheme: dark)').matches
-    meta.setAttribute('content', open ? (dark ? '#0b0b0d' : '#f5f6f8') : (dark ? '#000000' : '#ffffff'))
-  }, [state.sheet, state.confirm])
+    const mq = window.matchMedia?.('(prefers-color-scheme: dark)')
+    const apply = () => {
+      const dark = resolveDark(state.theme)
+      document.documentElement.classList.toggle('theme-dark', dark)
+      const meta = document.querySelector('meta[name="theme-color"]')
+      if (meta) meta.setAttribute('content', open ? (dark ? '#0b0b0d' : '#f5f6f8') : (dark ? '#000000' : '#ffffff'))
+    }
+    apply()
+    if (state.theme === 'system' && mq?.addEventListener) {
+      mq.addEventListener('change', apply)
+      return () => mq.removeEventListener('change', apply)
+    }
+    return undefined
+  }, [state.sheet, state.confirm, state.theme])
 
   if (state.booting) {
     return (

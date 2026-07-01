@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react'
 import { api, loadSession, saveSession, removeSession } from '../api/client.js'
 import { haptic } from '../utils/haptics.js'
+import { loadTheme, saveTheme } from '../utils/theme.js'
 import { StoreContext } from './context.js'
 
 const initialState = {
@@ -25,6 +26,7 @@ const initialState = {
   error: '',
   busy: false,
   booting: true,
+  theme: loadTheme(),
 }
 
 function reducer(state, action) {
@@ -393,10 +395,20 @@ export function StoreProvider({ children }) {
     [runBusy, callApi, refreshBootstrap, patch, setNotice],
   )
 
+  const setTheme = useCallback(
+    (theme) => {
+      saveTheme(theme)
+      haptic(8)
+      patch({ theme })
+    },
+    [patch],
+  )
+
   const actions = useMemo(
     () => ({
       patch,
       getState,
+      setTheme,
       callApi,
       setNotice,
       clearNotice,
@@ -419,7 +431,7 @@ export function StoreProvider({ children }) {
       updateProfile,
     }),
     [
-      patch, getState, callApi, setNotice, clearNotice, runBusy, requestConfirm, resolveConfirm, refreshBootstrap, clearSession,
+      patch, getState, setTheme, callApi, setNotice, clearNotice, runBusy, requestConfirm, resolveConfirm, refreshBootstrap, clearSession,
       signInWithGoogle, signInWithDevice, createGroup, joinGroup, leaveGroup, deleteGroup, saveHolding,
       deleteHolding, importDrafts, loadGroupAdvice, copyInviteCode, updateProfile,
     ],
