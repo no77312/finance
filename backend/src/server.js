@@ -24,7 +24,7 @@ import { readJsonBody, send, sendError } from "./http.js";
 import { parseScreenshotImport } from "./importParser.js";
 import { refreshHoldingsWithPreviousClose } from "./marketData.js";
 import { serveStaticAsset } from "./staticAssets.js";
-import { buildDailyDigest, handleTelegramUpdate, parseChatMap, persistDailyValuations, sendTelegramMessage } from "./telegramDigest.js";
+import { buildDailyDigest, buildHoldingChangeMessage, handleTelegramUpdate, parseChatMap, persistDailyValuations, resolveChatID, sendTelegramMessage } from "./telegramDigest.js";
 
 export function createPositionCircleServer(options) {
   const config = options.config ?? loadRuntimeConfig();
@@ -464,6 +464,7 @@ async function routeRequest(request, response, store, context) {
         snapshot
       };
     });
+    notifyHoldingChange(store, context, groupID, memberID, [result.event]);
     return send(response, 201, result);
   }
 
@@ -547,6 +548,7 @@ async function routeRequest(request, response, store, context) {
         }
       };
     });
+    notifyHoldingChange(store, context, groupID, memberID, result.events);
     return send(response, 200, result);
   }
 
@@ -578,6 +580,7 @@ async function routeRequest(request, response, store, context) {
         snapshot
       };
     });
+    notifyHoldingChange(store, context, groupID, memberID, [result.event]);
     return send(response, 200, result);
   }
 
@@ -605,6 +608,7 @@ async function routeRequest(request, response, store, context) {
         snapshot
       };
     });
+    notifyHoldingChange(store, context, groupID, memberID, [event.event]);
     return send(response, 200, event);
   }
 
@@ -760,6 +764,35 @@ function requireSessionForUser(data, memberID, request) {
   if (!userSessions.some((session) => session.token === providedToken)) {
     throw forbidden("SESSION_REQUIRED", "Valid session token is required.");
   }
+}
+
+// 有人提交调仓后，向绑定了 Telegram 的群推一条实时变动消息。
+// 采用 fire-and-forget：不阻塞用户的保存响应，推送失败也不影响主流程。
+function notifyHoldingChange(store, context, groupID, memberID, events) {
+  const botToken = context.config.telegramBotToken;
+  const list = (events ?? []).filter(Boolean);
+  if (!botToken || list.length === 0) {
+    return;
+  }
+
+  Promise.resolve()
+    .then(async () => {
+      const data = await store.read();
+      const group = data.groups.find((candidate) => candidate.id === groupID);
+      if (!group) {
+        return;
+      }
+      const chatID = resolveChatID(group, parseChatMap(context.config.telegramChatMap));
+      if (!chatID) {
+        return;
+      }
+      const member = group.members?.find((candidate) => candidate.id === memberID);
+      const text = buildHoldingChangeMessage({ group, events: list, actorName: member?.displayName ?? "成员" });
+      if (text) {
+        await sendTelegramMessage({ botToken, chatID, text });
+      }
+    })
+    .catch(() => {});
 }
 
 function appendHoldingEvent(data, event) {

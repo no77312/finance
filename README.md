@@ -97,11 +97,14 @@ PRICE_REFRESH_TOKEN=一段随机生成的刷新密钥
 
 支持的原型市场：美股、A 股、基金/ETF、加密货币。现金类持仓不会刷新价格。定时刷新由 `.github/workflows/refresh-prices.yml` 调用后端 `/api/admin/prices/refresh`，需要在 GitHub Actions Secrets 里配置同一个 `PRICE_REFRESH_TOKEN`。
 
-## Telegram 每日盈亏日报
+## Telegram 推送
 
-后端可以每天收盘后向 Telegram 群推送「每人当日盈亏」（较上一交易日、多币种折算美元）。推送由 `.github/workflows/refresh-prices.yml` 在刷新收盘价之后调用 `/api/admin/telegram/digest`，复用同一个 `PRICE_REFRESH_TOKEN`。
+绑定 Telegram 群后有两类推送：
 
-> 说明：日报会按成员真实持仓计算，包含成员在 App 内设为「隐藏成本/仅标的」的部分，请确保这个 Telegram 群和持仓圈群组是同一批可信成员。
+1. **每日盈亏日报**：每天收盘后推送「每人当日盈亏」（较上一交易日、多币种折算美元）。由 `.github/workflows/refresh-prices.yml` 在刷新收盘价之后调用 `/api/admin/telegram/digest`，复用同一个 `PRICE_REFRESH_TOKEN`。
+2. **实时调仓推送**：每当有成员新增、调整、清仓或截图同步持仓，立即向群里推送一条变动消息（标的 + 数量 + 成本 + 现价；一次截图同步合并成一条）。这是持仓写操作的副作用，采用 fire-and-forget，推送失败不影响保存；收盘价刷新不产生变动事件，所以不会刷屏。
+
+> 说明：以上推送都按成员真实持仓计算，包含成员在 App 内设为「隐藏成本/仅标的」的部分，请确保这个 Telegram 群和持仓圈群组是同一批可信成员。
 
 群组与 Telegram 群的绑定不写死在环境变量里，而是各群自助完成：把机器人拉进 Telegram 群后，发送 `/bind <持仓圈邀请码>`，后端通过 webhook 自动记录该群的 `chat_id`。
 
