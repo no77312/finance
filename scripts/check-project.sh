@@ -6,16 +6,13 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 echo "Checking backend API..."
 (cd "$ROOT_DIR/backend" && npm test)
 
-echo "Checking Swift core..."
-mkdir -p "$ROOT_DIR/.home" "$ROOT_DIR/.build/module-cache"
-(
-  cd "$ROOT_DIR"
-  HOME="$ROOT_DIR/.home" \
-  CLANG_MODULE_CACHE_PATH="$ROOT_DIR/.build/module-cache" \
-  swift run PositionCircleChecks --scratch-path "$ROOT_DIR/.build"
-)
+echo "Checking structural health score..."
+(cd "$ROOT_DIR/backend" && npm run test:advice)
 
-echo "Checking Xcode project file..."
-plutil -lint "$ROOT_DIR/iOSApp/PositionCircle.xcodeproj/project.pbxproj"
+echo "Checking market data (Yahoo) symbol mapping..."
+(cd "$ROOT_DIR/backend" && npm run test:market)
+
+echo "Checking Telegram digest / webhook / change push..."
+(cd "$ROOT_DIR/backend" && npm run test:telegram)
 
 echo "All checks passed."

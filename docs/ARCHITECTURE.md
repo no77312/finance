@@ -4,11 +4,10 @@
 
 当前交付分成两层：
 
-- `PositionCircleCore`：纯 Swift 核心模块，包含数据模型、示例数据和聚合逻辑。
-- `iOSApp/PositionCircle`：SwiftUI App，直接复用核心模型文件，使用 `PortfolioStore` 管理 UI 状态，并通过 `PositionCircleAPIClient` 同步后端。
-- `backend`：Node 本地 API 服务，使用 JSON 文件持久化，提供群组、持仓和聚合分析接口。
+- `backend/web`：React + Vite 的 PWA 前端（移动端优先），通过 `StoreContext` 管理状态，调用后端 REST API。
+- `backend`：Node API 服务，使用 JSON 文件持久化，提供群组、持仓、聚合分析、行情刷新、Telegram 推送等接口，并托管构建后的 PWA。
 
-这样设计的好处是：持仓计算、币种聚合、成员汇总等规则不绑死在 UI 里，未来接后端或写测试时可以继续复用。
+这样设计的好处是：持仓计算、币种聚合、成员汇总等规则集中在后端，前端只做展示。
 
 ## 核心模型
 

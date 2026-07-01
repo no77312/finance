@@ -1,20 +1,17 @@
 # 持仓圈 PositionCircle
 
-一个 iOS 群组持仓共享 App 原型：同一个群组里的成员可以提交自己的持仓，大家可以查看群组共识标的、成员持仓和个人提交记录。
+一个群组持仓共享 Web App（PWA）原型：同一个群组里的成员可以提交自己的持仓，大家可以查看群组共识标的、成员持仓和个人提交记录。
 
 ## 已完成内容
 
-- SwiftUI iOS 原型：群组首页、总览、我的持仓、成员列表、提交/编辑/删除持仓、截图导入、新建群组。
-- PWA 网页版：同一个 Render 服务直接托管移动端网页，可添加到手机主屏幕，支持 Google 登录、群组、成员持仓和提交持仓。
-- Node 后端：本地 API、文件持久化、群组/持仓 CRUD、聚合分析接口。
-- iOS 网络层：启动拉取后端数据，保存/删除同步后端，后端不可用时回退到演示数据。
-- 截图导入：iOS 本地 OCR 识别截图文字，后端可用 OpenAI 大模型解析成持仓草稿，确认后写入。
-- 表现追踪：后端提供受保护的收盘价刷新接口，GitHub Actions 可每天收盘后自动调用。
+- PWA 网页版（React + Vite）：移动端优先，可添加到手机主屏幕，支持 Google 登录、群组、成员持仓、提交/编辑/删除持仓、截图导入、AI 组合健康度。
+- Node 后端：API、文件持久化、群组/持仓 CRUD、聚合分析接口，同一个 Render 服务托管 PWA 静态页面。
+- 截图导入：网页把压缩后的截图发给后端，由后端用 OpenAI 视觉解析成持仓草稿，确认后写入。
+- 表现追踪：后端提供受保护的收盘价刷新接口，GitHub Actions 每天收盘后自动调用（默认走 Yahoo 行情）。
+- Telegram 推送：每日盈亏日报 + 实时调仓推送，群内 `/bind` 邀请码自助绑定。
 - 变动记录：“我的持仓”展示最近提交、编辑、删除持仓的时间轴。
 - 核心业务模块：成员、群组、持仓、可见性、币种、按标的聚合、按币种汇总。
 - 隐私基础能力：支持完整可见、隐藏成本、仅标的三种可见性。
-- Xcode 工程：`iOSApp/PositionCircle.xcodeproj`。
-- SwiftPM 核心检查：`PositionCircleChecks` 可编译并验证聚合逻辑。
 
 ## 1. 启动后端
 
@@ -57,29 +54,24 @@ http://localhost:8787
 
 详细步骤见 [PWA Google 登录配置](docs/PWA_GOOGLE.md)。
 
-## 2. 运行 iOS App
+## 2. 运行 Web 前端（开发）
 
-1. 用 Xcode 打开：
+Web 前端在 `backend/web/`（React + Vite），构建产物输出到 `backend/public/` 由后端托管。
 
-   `iOSApp/PositionCircle.xcodeproj`
-
-2. 选择 iPhone 模拟器。
-
-3. 点击 Run。
-
-iOS App 默认连接线上 Render 后端：
-
-```text
-https://position-circle-api.onrender.com
+```bash
+cd backend
+npm run web:install   # 首次安装前端依赖
+npm run web:dev       # Vite 开发服务器，/api 代理到本地后端 8787
+npm run web:build     # 构建到 backend/public/
 ```
 
-如果要调试本地后端，可以把 `PositionCircleAPIClient` 里的 `baseURL` 临时改回 `http://127.0.0.1:8787`。在 iOS Simulator 中，这个地址会指向本机 Mac；真机调试时需要改成 Mac 的局域网 IP。
+线上直接访问 Render 地址即可（后端已托管构建后的 PWA）。
 
 ## 截图导入配置
 
-截图导入不要求上传原图。iOS 会先在本地 OCR，然后把文字发给后端解析。
+截图导入由网页把压缩后的截图发给后端解析，不要求上传原图。
 
-后端未配置 `OPENAI_API_KEY` 时，会使用基础规则解析；配置后会使用大模型解析：
+后端未配置 `OPENAI_API_KEY` 时，会使用基础规则解析；配置后会使用大模型视觉解析：
 
 ```text
 OPENAI_API_KEY=你的 OpenAI API Key
@@ -165,24 +157,14 @@ cd backend && npm run test:telegram
 bash scripts/check-project.sh
 ```
 
-这会依次运行：
-
-- 后端 API 检查。
-- Swift 核心聚合检查。
-- Xcode 工程文件格式检查。
-
-## 单独运行核心检查
-
-在项目根目录执行：
+这会运行后端 API 检查以及健康分、行情、Telegram 相关单测。也可以单独跑：
 
 ```bash
-env HOME=/Users/bytedance/Documents/Codex/2026-06-15/ios-app/outputs/PositionCircle/.home CLANG_MODULE_CACHE_PATH=/Users/bytedance/Documents/Codex/2026-06-15/ios-app/outputs/PositionCircle/.build/module-cache swift run PositionCircleChecks --scratch-path /Users/bytedance/Documents/Codex/2026-06-15/ios-app/outputs/PositionCircle/.build
-```
-
-已验证输出：
-
-```text
-PositionCircleCore checks passed
+cd backend
+npm test            # 后端 API 套件
+npm run test:advice   # 结构健康分
+npm run test:market   # Yahoo 行情映射
+npm run test:telegram # Telegram 日报/绑定/调仓推送
 ```
 
 ## 目录结构
@@ -190,22 +172,16 @@ PositionCircleCore checks passed
 ```text
 PositionCircle/
 ├── backend/
-│   ├── src/
-│   ├── data/
-│   ├── public/
+│   ├── src/        # Node 后端
+│   ├── data/       # seed.json / store.json
+│   ├── public/     # PWA 构建产物 + 静态资源
+│   ├── web/        # React + Vite 前端源码
 │   └── test/
-├── Package.swift
-├── Sources/
-│   ├── PositionCircleCore/
-│   └── PositionCircleChecks/
-├── iOSApp/
-│   ├── PositionCircle.xcodeproj/
-│   └── PositionCircle/
 └── docs/
 ```
 
 ## 重要说明
 
-当前是本地全栈原型：后端使用 JSON 文件持久化，iOS 在后端不可用时会回退到 `DemoData`。生产版本需要接入登录、数据库、权限校验、行情服务和审计日志。
+当前是全栈原型：后端使用 JSON 文件持久化。生产版本需要接入数据库、更完整的权限校验、行情服务和审计日志。
 
 示例价格仅用于演示，不代表实时行情，也不构成投资建议。
