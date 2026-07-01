@@ -3,11 +3,10 @@ import { motion } from 'framer-motion'
 import { useStore } from '../store/useStore.js'
 import { Avatar } from '../components/Avatar.jsx'
 import Icon from '../components/Icon.jsx'
-import { AllocationStrip, LegendChips, DonutChart } from '../components/Visuals.jsx'
-import { DONUT_COLORS } from '../utils/colors.js'
+import { AllocationStrip, LegendChips } from '../components/Visuals.jsx'
 import AnimatedNumber from '../components/AnimatedNumber.jsx'
 import { money, formatNumber, formatPercent, formatDateTime, signedPercentPoint } from '../utils/format.js'
-import { visibleSummary, exposureRows, groupMarketRows, labelForMarket } from '../utils/finance.js'
+import { visibleSummary, exposureRows } from '../utils/finance.js'
 import {
   groupHoldings,
   groupLatestSnapshotAt,
@@ -28,7 +27,6 @@ export default function OverviewView({ group }) {
     const summary = visibleSummary(holdings, memberID)
     const exposures = exposureRows(holdings, memberID)
     const consensus = exposures.filter((e) => e.holderCount > 1)
-    const marketRows = groupMarketRows(holdings, memberID)
     const contributingIDs = new Set(holdings.map((h) => h.ownerID))
     const latestAt = groupLatestSnapshotAt(data, group.id)
     const snapshots = recentSnapshotSummaries(data, group.id, members, memberID).slice(0, 6)
@@ -44,13 +42,13 @@ export default function OverviewView({ group }) {
       insights: buildPortfolioInsights(data, group.id, member.id, memberID),
     }))
     return {
-      members, summary, consensus, marketRows, contributingIDs, latestAt, snapshots,
+      members, summary, consensus, contributingIDs, latestAt, snapshots,
       consensusStrength, top3, top3Weight, activeMembers, activity, memberInsights,
     }
   }, [data, group, memberID])
 
   const {
-    members, summary, consensus, marketRows, contributingIDs, latestAt, snapshots,
+    members, summary, consensus, contributingIDs, latestAt, snapshots,
     consensusStrength, top3, top3Weight, activeMembers, activity, memberInsights,
   } = view
 
@@ -101,31 +99,6 @@ export default function OverviewView({ group }) {
           <SignalRow label="活跃度" detail={`近 24h ${activeMembers.size}/${members.length} 位提交`} value={activity} />
         </div>
 
-        <div className="overview-market-row">
-          <span className="overview-market-label">市场分布</span>
-          {marketRows.length === 0 ? (
-            <div className="overview-market-chips"><span className="legend-chip">暂无可见仓位</span></div>
-          ) : (
-            <div className="overview-market-viz">
-              <DonutChart
-                slices={marketRows.slice(0, 6).map((row) => ({ market: row.market, weight: row.weight }))}
-                size={104}
-                thickness={15}
-                centerValue={`${marketRows.length}`}
-                centerLabel="市场"
-              />
-              <div className="overview-market-legend">
-                {marketRows.slice(0, 6).map((row, i) => (
-                  <span key={row.market} className="overview-market-legend-item">
-                    <span className="dot" style={{ background: DONUT_COLORS[i % DONUT_COLORS.length] }} />
-                    <span className="overview-market-legend-name">{labelForMarket(row.market)}</span>
-                    <strong>{formatPercent(row.weight)}</strong>
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
       </section>
 
       {/* 共识标的 */}
